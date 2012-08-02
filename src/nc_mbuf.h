@@ -20,11 +20,15 @@
 
 #include <nc_core.h>
 
-#define MCOPY_CODEC(ACTION)         \
-    ACTION( MCOPY_GET,  "get "  )   \
-    ACTION( MCOPY_GETS, "gets " )   \
-    ACTION( MCOPY_CRLF, "\r\n"  )   \
-    ACTION( MCOPY_NIL,  ""      )   \
+#define MCOPY_CODEC(ACTION)                          \
+    ACTION( MCOPY_CRLF,  "\r\n"                     )\
+    ACTION( MCOPY_MGET,  "*0\r\n$4\r\nmget\r\n"     )\
+    ACTION( MCOPY_MGET1, "*0\r\n$4\r\nmget\r\n"     )\
+    ACTION( MCOPY_MGET2, "*00\r\n$4\r\nmget\r\n"    )\
+    ACTION( MCOPY_MGET3, "*000\r\n$4\r\nmget\r\n"   )\
+    ACTION( MCOPY_MGET4, "*0000\r\n$4\r\nmget\r\n"  )\
+    ACTION( MCOPY_DEL,   "*0\r\n$4\r\ndel\r\n"      )\
+    ACTION( MCOPY_NIL,   ""                         )\
 
 #define DEFINE_ACTION(_type, _str) _type,
 typedef enum mcopy_type {

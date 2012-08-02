@@ -213,8 +213,6 @@ mbuf_mcopy(struct mbuf *mbuf, mcopy_type_t copy)
     uint8_t *pos;
     size_t n;
 
-    ASSERT(copy >= MCOPY_GET && copy < MCOPY_SENTINEL);
-
     pos = mcopy_strings[copy].data;
     n = mcopy_strings[copy].len;
 

@@ -421,55 +421,6 @@ req_forward_stats(struct context *ctx, struct server *server, struct msg *msg)
     stats_server_incr(ctx, server, requests);
     stats_server_incr_by(ctx, server, request_bytes, msg->mlen);
 
-    switch (msg->type) {
-    case MSG_REQ_GET:
-        stats_server_incr(ctx, server, get);
-        break;
-
-    case MSG_REQ_GETS:
-        stats_server_incr(ctx, server, gets);
-        break;
-
-    case MSG_REQ_DELETE:
-        stats_server_incr(ctx, server, delete);
-        break;
-
-    case MSG_REQ_CAS:
-        stats_server_incr(ctx, server, cas);
-        break;
-
-    case MSG_REQ_SET:
-        stats_server_incr(ctx, server, set);
-        break;
-
-    case MSG_REQ_ADD:
-        stats_server_incr(ctx, server, add);
-        break;
-
-    case MSG_REQ_REPLACE:
-        stats_server_incr(ctx, server, replace);
-        break;
-
-    case MSG_REQ_APPEND:
-        stats_server_incr(ctx, server, append);
-        break;
-
-    case MSG_REQ_PREPEND:
-        stats_server_incr(ctx, server, prepend);
-        break;
-
-    case MSG_REQ_INCR:
-        stats_server_incr(ctx, server, incr);
-        break;
-
-    case MSG_REQ_DECR:
-        stats_server_incr(ctx, server, decr);
-        break;
-
-    default:
-        NOT_REACHED();
-    }
-
     if (msg->noreply) {
         stats_server_incr(ctx, server, noreply);
     }
@@ -491,7 +442,7 @@ req_forward(struct context *ctx, struct conn *c_conn, struct msg *msg)
     }
 
     key = msg->key_start;
-    keylen = (uint32_t)(msg->key_end - msg->key_start + 1);
+    keylen = (uint32_t)(msg->key_end - msg->key_start);
 
     s_conn = server_pool_conn(ctx, c_conn->owner, key, keylen);
     if (s_conn == NULL) {

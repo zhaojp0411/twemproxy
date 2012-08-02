@@ -1,0 +1,93 @@
+- arglen
+- vlen
+- alternate names:
+  rlen    (running length used by paring state machine)
+  rem_len (remaining length)
+  plen (parsed length)
+  rplen (remaining parsed length)
+
+  rnarg /* running # args */
+  rlen  /* running length */
+
+  item_max_vlen:
+
+ /* "*3\r\n$6\r\nappend\r\n$4\r\nkey1\r\n$6\r\nvalue1"
+ * *<narg>\r\n$<arglen>\r\n<argdata>\r\n
+ * where
+ *  narg    # of arguments
+ *  arglen  # bytes in argument
+ *  argdata # argument data
+ */
+
+(narg, narg_start, narg_end, | narg_rem)
+
+        /* headcopy = parse_redis_headcopy_mget() */
+        /* headcopy = parse_redis_tailcopy_mget() */
+        /* nc_parse_redis.[ch] */
+        /* nc_parse_memcache.[ch] */
+
+
+HOW MBUF SPLIT SHOULD WORK!
+
+'*3\r\n$3\r\nset\r\n$5\r\nmykey\r\n$7\r\nmyvalue\r\n'
+
+'*3\r\n$3\r\nset\r\n$5\r\nmykey\r\n$7\r\nmyvalue\r\n'
+'*3\r\n$3\r\nset\r\n$5\r\nMYKEY\r\n$7\r\nMYVALUE\r\n'
+
+Req:
+    '*3\r\n$4\r\nmget\r\n$5\r\nmykey\r\n$5\r\nMYKEY\r\n'
+
+    '*2\r\n$4\r\nmget\r\n$5\r\nmykey\r\n'
+    '*2\r\n$4\r\nmget\r\n$5\r\nMYKEY\r\n'
+
+    10 <- 9
+
+Rsp:
+    '*2\r\n$7\r\nmyvalue\r\n$7\r\nMYVALUE\r\n'
+==
+    '*1\r\n$7\r\nmyvalue\r\n'
+    '*1\r\n$7\r\nMYVALUE\r\n'
+
+nc_parse.[ch]
+    nc_parse_memcache.[ch]
+    nc_parse_redis.[ch]
+
+    parse_redis_request();
+    parse_redis_response();
+    parse_redis_copy_mget();
+
+    parse_memcache_request();
+    parse_memcache_response();
+
+    ACTION( MCOPY_GET,  "get "  )   \
+    ACTION( MCOPY_GETS, "gets " )   \
+
+#define MCOPY_CODEC(ACTION)         \
+    ACTION( MCOPY_GET,  "get "  )   \
+    ACTION( MCOPY_GETS, "gets " )   \
+    ACTION( MCOPY_CRLF, "\r\n"  )   \
+    ACTION( MCOPY_MGET, "*0\r\n$4\r\nmget\r\n" )   \
+    ACTION( MCOPY_DEL, "*0\r\n$4\r\ndel\r\n" )   \
+    ACTION( MCOPY_NIL,  ""      )   \
+
+ mcopy_strings is used to copy static strings
+
+ what if you wanted to copy dynamic string, essentially each copy operation was a callback
+
+mbuf_mcopy(struct mbuf *mbuf, mcopy_type_t copy) -->
+
+mbuf_mcpy(struct mbuf *mbuf, mcopy_handler)
+
+So, you would have a copy handler for get, gets, crlf, "*length"...."....
+
+struct mcopy {
+    int len;
+    void (*handler)(..., ...);
+}
+
+struct mcopy noop = {};
+
+Q: where do you do it.
+
+mbuf_split(mhdr, pos, headcopy, tailcopy);
+           mcopy_type_t tailcopy)

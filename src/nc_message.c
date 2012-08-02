@@ -221,25 +221,30 @@ done:
     msg->result = PARSE_OK;
 
     msg->type = MSG_UNKNOWN;
+
     msg->key_start = NULL;
     msg->key_end = NULL;
-    msg->vlen = 0;
-    msg->end = NULL;
+
+    msg->narg_start = NULL;
+    msg->narg_end = NULL;
+    msg->narg = 0;
+
+    msg->rnarg = 0;
+    msg->rlen = 0;
+
+    msg->frag_owner = NULL;
+    msg->nfrag = 0;
     msg->frag_id = 0;
 
     msg->err = 0;
     msg->error = 0;
     msg->ferror = 0;
     msg->request = 0;
-    msg->storage = 0;
-    msg->retrieval = 0;
-    msg->arithmetic = 0;
-    msg->delete = 0;
     msg->quit = 0;
-    msg->cas = 0;
     msg->noreply = 0;
     msg->done = 0;
     msg->fdone = 0;
+    msg->first_fragment = 0;
     msg->last_fragment = 0;
     msg->swallow = 0;
 
@@ -280,7 +285,7 @@ msg_get_error(err_t err)
     }
 
     msg->state = 0;
-    msg->type = MSG_RSP_SERVER_ERROR;
+    msg->type = MSG_RSP_REDIS_ERROR;
 
     mbuf = mbuf_get();
     if (mbuf == NULL) {
@@ -289,7 +294,7 @@ msg_get_error(err_t err)
     }
     mbuf_insert(&msg->mhdr, mbuf);
 
-    n = nc_scnprintf(mbuf->last, mbuf->end - mbuf->last, "SERVER_ERROR %s"CRLF,
+    n = nc_scnprintf(mbuf->last, mbuf->end - mbuf->last, "-ERR %s"CRLF,
                      errstr);
     mbuf->last += n;
     msg->mlen = (uint32_t)n;
@@ -426,14 +431,67 @@ msg_fragment(struct context *ctx, struct conn *conn, struct msg *msg)
 
     ASSERT(conn->client && !conn->proxy);
     ASSERT(msg->request);
-    ASSERT(msg->type == MSG_REQ_GET || msg->type == MSG_REQ_GETS);
 
-    headcopy = (msg->type == MSG_REQ_GET) ? MCOPY_GET : MCOPY_GETS;
-    tailcopy = MCOPY_CRLF;
+    switch (msg->type) {
+    case MSG_REQ_REDIS_MGET:
+        headcopy = MCOPY_MGET;
+        tailcopy = MCOPY_NIL;
+        break;
+
+    default:
+        NOT_REACHED();
+        headcopy = MCOPY_NIL;
+        tailcopy = MCOPY_NIL;
+        break;
+    }
 
     nbuf = mbuf_split(&msg->mhdr, msg->pos, headcopy, tailcopy);
     if (nbuf == NULL) {
         return NC_ENOMEM;
+    }
+
+    /*
+     * msg_post_split_repair()
+     *
+     * redis_head_copy
+     * redis_tail_copy
+     *
+     */
+    if (msg->type == MSG_REQ_REDIS_MGET) {
+        struct mbuf *mbuf = STAILQ_LAST(&msg->mhdr, mbuf, next);
+
+        /* FIX THE head MBUF in the HEAD MESSAGE */
+        {
+            /* ADD the MULTI-BULK header *<len>\r\n */
+            char num[NC_UINTMAX_MAXLEN];
+            int n;
+            int len = msg->narg_end - msg->narg_start;
+
+            ASSERT(len > 0);
+
+            n = nc_snprintf(num, sizeof(num), "%"PRIu32"", 2);
+            ASSERT(n == 1);
+
+            //if (len > (n - 1)) {
+            //    n = nc_snprintf(num, sizeof(num), "*%0*"PRIu32"", len, 2);
+            //}
+
+            nc_memcpy(msg->narg_start, num, n);
+            log_hexdump(LOG_INFO, mbuf->pos, mbuf->last - mbuf->pos, "head mbuf: ");
+        }
+
+
+        /* FIX THE head MBUF in the TAIL MESSAGE */
+        {
+            char num[NC_UINTMAX_MAXLEN];
+            int n;
+
+            memset(num, '0', sizeof(num));
+            n = nc_snprintf(num, sizeof(num), "*%"PRIu32"", msg->narg - 1);
+
+            nc_memcpy(nbuf->pos, num, n);
+            log_hexdump(LOG_INFO, nbuf->pos, nbuf->last - nbuf->pos, "tail mbuf:");
+        }
     }
 
     nmsg = msg_get(msg->owner, msg->request);
@@ -450,11 +508,19 @@ msg_fragment(struct context *ctx, struct conn *conn, struct msg *msg)
 
     /* attach unique fragment id to all fragments of the same message */
     if (msg->frag_id == 0) {
+        /* this is where we can create a fragmented response, the first time, or on the retrun path */
         msg->frag_id = ++frag_id;
+        msg->first_fragment = 1;
+        msg->nfrag++;
+        msg->frag_owner = msg;
     }
     nmsg->frag_id = msg->frag_id;
     msg->last_fragment = 0;
     nmsg->last_fragment = 1;
+
+    /* REDIS hack */
+    nmsg->frag_owner = msg->frag_owner;
+    nmsg->frag_owner->nfrag++;
 
     stats_pool_incr(ctx, conn->owner, fragments);
 

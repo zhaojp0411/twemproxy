@@ -114,7 +114,6 @@ proxy_reuse(struct conn *p)
 
     default:
         NOT_REACHED();
-        status = NC_ERROR;
     }
 
     return status;

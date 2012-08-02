@@ -201,57 +201,11 @@ rsp_forward_stats(struct context *ctx, struct msg *msg, struct conn *s_conn,
     stats_server_incr_by(ctx, server, response_bytes, msg->mlen);
 
     switch (msg->type) {
-    case MSG_RSP_NUM:
-        stats_server_incr(ctx, server, num);
-        break;
-
-    case MSG_RSP_STORED:
-        stats_server_incr(ctx, server, stored);
-        break;
-
-    case MSG_RSP_NOT_STORED:
-        stats_server_incr(ctx, server, not_stored);
-        break;
-
-    case MSG_RSP_EXISTS:
-        stats_server_incr(ctx, server, exists);
-        break;
-
-    case MSG_RSP_NOT_FOUND:
-        stats_server_incr(ctx, server, not_found);
-        break;
-
-    case MSG_RSP_END:
-        stats_server_incr(ctx, server, end);
-        break;
-
-    case MSG_RSP_VALUE:
-        stats_server_incr(ctx, server, value);
-        break;
-
-    case MSG_RSP_DELETED:
-        stats_server_incr(ctx, server, deleted);
-        break;
-
-    case MSG_RSP_ERROR:
-        log_debug(LOG_INFO, "rsp error type %d from s %d for req %"PRIu64" "
-                  "type %d from c %d", msg->type, s_conn->sd, pmsg->id,
-                  pmsg->type, c_conn->sd);
-        stats_server_incr(ctx, server, error);
-        break;
-
-    case MSG_RSP_CLIENT_ERROR:
-        log_debug(LOG_INFO, "rsp error type %d from s %d for req %"PRIu64" "
-                  "type %d from c %d", msg->type, s_conn->sd, pmsg->id,
-                  pmsg->type, c_conn->sd);
-        stats_server_incr(ctx, server, client_error);
-        break;
-
-    case MSG_RSP_SERVER_ERROR:
-        log_debug(LOG_INFO, "rsp error type %d from s %d for req %"PRIu64" "
-                  "type %d from c %d", msg->type, s_conn->sd, pmsg->id,
-                  pmsg->type, c_conn->sd);
-        stats_server_incr(ctx, server, server_error);
+    case MSG_RSP_REDIS_STATUS:
+    case MSG_RSP_REDIS_ERROR:
+    case MSG_RSP_REDIS_INTEGER:
+    case MSG_RSP_REDIS_BULK:
+    case MSG_RSP_REDIS_MULTIBULK:
         break;
 
     default:
@@ -283,44 +237,32 @@ rsp_forward(struct context *ctx, struct conn *s_conn, struct msg *msg)
     pmsg->peer = msg;
     msg->peer = pmsg;
 
-    /*
-     * Readjust responses of fragmented messages by not including the end
-     * marker for all but the last response
-     *
-     * Valid responses for a fragmented requests are MSG_RSP_VALUE or,
-     * MSG_RSP_END. For an invalid response, we send out SERVER_ERRROR with
-     * EINVAL errno
-     */
     if (pmsg->frag_id != 0) {
-        if (msg->type != MSG_RSP_VALUE && msg->type != MSG_RSP_END) {
+
+        if (msg->type != MSG_RSP_REDIS_MULTIBULK) {
             pmsg->error = 1;
             pmsg->err = EINVAL;
-        } else if (!pmsg->last_fragment) {
-            ASSERT(msg->end != NULL);
-            for (;;) {
-                struct mbuf *mbuf;
+        } else {
+            struct mbuf *mbuf;
 
-                mbuf = STAILQ_LAST(&msg->mhdr, mbuf, next);
+            mbuf = STAILQ_LAST(&msg->mhdr, mbuf, next);
+
+            msg->narg_end += CRLF_LEN;
+            msg->mlen -= (uint32_t)(msg->narg_end - mbuf->pos);
+            /* FIXME: what if you cross the mbuf->last boundary */
+            mbuf->pos = msg->narg_end;
+
+            if (pmsg->first_fragment) {
+                int n;
+
+                mbuf = mbuf_get();
                 ASSERT(mbuf != NULL);
 
-                /*
-                 * We cannot assert that end marker points to the last mbuf
-                 * Consider a scenario where end marker points to the
-                 * penultimate mbuf and the last mbuf only contains spaces
-                 * and CRLF: mhdr -> [...END] -> [\r\n]
-                 */
+                STAILQ_INSERT_HEAD(&msg->mhdr, mbuf, next);
 
-                if (msg->end >= mbuf->pos && msg->end < mbuf->last) {
-                    /* end marker is within this mbuf */
-                    msg->mlen -= (uint32_t)(mbuf->last - msg->end);
-                    mbuf->last = msg->end;
-                    break;
-                }
-
-                /* end marker is not in this mbuf */
-                msg->mlen -= mbuf_length(mbuf);
-                mbuf_remove(&msg->mhdr, mbuf);
-                mbuf_put(mbuf);
+                n = nc_scnprintf(mbuf->last, mbuf->end - mbuf->last, "*%d\r\n", pmsg->nfrag);
+                mbuf->last += n;
+                msg->mlen += (uint32_t)n;
             }
         }
     }
