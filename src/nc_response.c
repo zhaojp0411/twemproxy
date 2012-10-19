@@ -157,11 +157,9 @@ rsp_filter(struct context *ctx, struct conn *conn, struct msg *msg)
 
     pmsg = TAILQ_FIRST(&conn->omsg_q);
     if (pmsg == NULL) {
-        log_error("filter stray rsp %"PRIu64" len %"PRIu32" on s %d", msg->id,
-                  msg->mlen, conn->sd);
+        log_debug(LOG_ERR, "filter stray rsp %"PRIu64" len %"PRIu32" on s %d",
+                  msg->id, msg->mlen, conn->sd);
         rsp_put(msg);
-        errno = EINVAL;
-        conn->err = errno;
         return true;
     }
     ASSERT(pmsg->peer == NULL);
@@ -219,6 +217,7 @@ rsp_forward(struct context *ctx, struct conn *s_conn, struct msg *msg)
     rstatus_t status;
     struct msg *pmsg;
     struct conn *c_conn;
+    struct mbuf *mbuf;
 
     ASSERT(!s_conn->client && !s_conn->proxy);
 
@@ -239,31 +238,55 @@ rsp_forward(struct context *ctx, struct conn *s_conn, struct msg *msg)
 
     if (pmsg->frag_id != 0) {
 
-        if (msg->type != MSG_RSP_REDIS_MULTIBULK) {
+        switch (msg->type) {
+        case MSG_RSP_REDIS_INTEGER:
+            /*
+             * Only redis 'del' command is a candidate for fragmentation
+             * and sends back a integer reply.
+             *
+             * Because of how we parse replies, the integer reply will be
+             * completely encpsuated in a single mbuf and we should skip
+             * over all the mbuf contents as the parser has already parsed
+             * and stored reply in msg->integer
+             */
+            mbuf = STAILQ_FIRST(&msg->mhdr);
+
+            ASSERT(pmsg->type == MSG_REQ_REDIS_DEL);
+            ASSERT(mbuf == STAILQ_LAST(&msg->mhdr, mbuf, next));
+            ASSERT(msg->mlen == mbuf_length(mbuf));
+
+            msg->mlen -= mbuf_length(mbuf);
+            mbuf_rewind(mbuf);
+
+            mbuf->pos = mbuf->start;
+            mbuf->last = mbuf->pos;
+
+            break;
+
+        case MSG_RSP_REDIS_MULTIBULK:
+            /*
+             * Only redis 'mget' command is a candidate for fragmentation
+             * and sends back a multi-bulk reply
+             *
+             * The muti-bulk reply can span over multiple mbufs and in each
+             * reply we would like to skip over the narg token.
+             *
+             * Furthermore, because of the way I parse and tokenize replies,
+             * the '\r\n' might not exists in a contiguous region.
+             */
+            mbuf = STAILQ_FIRST(&msg->mhdr);
+            ASSERT(msg->narg_start == mbuf->pos);
+            msg->narg_end += CRLF_LEN;
+            msg->mlen -= (uint32_t) (msg->narg_end - msg->narg_start);
+            mbuf->pos = msg->narg_end;
+            break;
+
+        default:
+            mbuf = STAILQ_FIRST(&msg->mhdr);
+            log_hexdump(LOG_ERR, mbuf->pos, mbuf_length(mbuf), "rsp fragment "
+                        "with unknown type %d", msg->type);
             pmsg->error = 1;
             pmsg->err = EINVAL;
-        } else {
-            struct mbuf *mbuf;
-
-            mbuf = STAILQ_LAST(&msg->mhdr, mbuf, next);
-
-            msg->narg_end += CRLF_LEN;
-            msg->mlen -= (uint32_t)(msg->narg_end - mbuf->pos);
-            /* FIXME: what if you cross the mbuf->last boundary */
-            mbuf->pos = msg->narg_end;
-
-            if (pmsg->first_fragment) {
-                int n;
-
-                mbuf = mbuf_get();
-                ASSERT(mbuf != NULL);
-
-                STAILQ_INSERT_HEAD(&msg->mhdr, mbuf, next);
-
-                n = nc_scnprintf(mbuf->last, mbuf->end - mbuf->last, "*%d\r\n", pmsg->nfrag);
-                mbuf->last += n;
-                msg->mlen += (uint32_t)n;
-            }
         }
     }
 

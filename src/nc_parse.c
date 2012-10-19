@@ -20,29 +20,83 @@
 #include <nc_core.h>
 #include <nc_parse.h>
 
+/*
+ * Return true, if the redis command accepts no arguments, otherwise
+ * return false
+ */
+static bool
+parse_arg0(struct msg *r)
+{
+    switch (r->type) {
+    case MSG_REQ_REDIS_EXISTS:
+    case MSG_REQ_REDIS_PERSIST:
+    case MSG_REQ_REDIS_PTTL:
+    case MSG_REQ_REDIS_TTL:
+    case MSG_REQ_REDIS_TYPE:
+
+    case MSG_REQ_REDIS_DECR:
+    case MSG_REQ_REDIS_GET:
+    case MSG_REQ_REDIS_INCR:
+    case MSG_REQ_REDIS_STRLEN:
+
+    case MSG_REQ_REDIS_HGETALL:
+    case MSG_REQ_REDIS_HKEYS:
+    case MSG_REQ_REDIS_HLEN:
+    case MSG_REQ_REDIS_HVALS:
+
+    case MSG_REQ_REDIS_LLEN:
+    case MSG_REQ_REDIS_LPOP:
+    case MSG_REQ_REDIS_RPOP:
+
+    case MSG_REQ_REDIS_SCARD:
+    case MSG_REQ_REDIS_SMEMBERS:
+    case MSG_REQ_REDIS_SPOP:
+    case MSG_REQ_REDIS_SRANDMEMBER:
+
+    case MSG_REQ_REDIS_ZCARD:
+        return true;
+
+    default:
+        break;
+    }
+
+    return false;
+}
+
+/*
+ * Return true, if the redis command accepts exactly 1 argument, otherwise
+ * return false
+ */
 static bool
 parse_arg1(struct msg *r)
 {
     switch (r->type) {
-    case MSG_REQ_REDIS_GET:
-    case MSG_REQ_REDIS_TTL:
-    case MSG_REQ_REDIS_DECR:
-    case MSG_REQ_REDIS_HLEN:
-    case MSG_REQ_REDIS_INCR:
-    case MSG_REQ_REDIS_LLEN:
-    case MSG_REQ_REDIS_LPOP:
-    case MSG_REQ_REDIS_RPOP:
-    case MSG_REQ_REDIS_SPOP:
-    case MSG_REQ_REDIS_TYPE:
-    case MSG_REQ_REDIS_HKEYS:
-    case MSG_REQ_REDIS_HVALS:
-    case MSG_REQ_REDIS_SCARD:
-    case MSG_REQ_REDIS_EXISTS:
-    case MSG_REQ_REDIS_STRLEN:
-    case MSG_REQ_REDIS_HGETALL:
-    case MSG_REQ_REDIS_PERSIST:
-    case MSG_REQ_REDIS_SMEMBERS:
-    case MSG_REQ_REDIS_SRANDMEMBER:
+    case MSG_REQ_REDIS_EXPIRE:
+    case MSG_REQ_REDIS_EXPIREAT:
+    case MSG_REQ_REDIS_PEXPIRE:
+    case MSG_REQ_REDIS_PEXPIREAT:
+
+    case MSG_REQ_REDIS_APPEND:
+    case MSG_REQ_REDIS_DECRBY:
+    case MSG_REQ_REDIS_GETBIT:
+    case MSG_REQ_REDIS_GETSET:
+    case MSG_REQ_REDIS_INCRBY:
+    case MSG_REQ_REDIS_INCRBYFLOAT:
+    case MSG_REQ_REDIS_SET:
+    case MSG_REQ_REDIS_SETNX:
+
+    case MSG_REQ_REDIS_HEXISTS:
+    case MSG_REQ_REDIS_HGET:
+
+    case MSG_REQ_REDIS_LINDEX:
+    case MSG_REQ_REDIS_LPUSHX:
+    case MSG_REQ_REDIS_RPUSHX:
+
+    case MSG_REQ_REDIS_SISMEMBER:
+
+    case MSG_REQ_REDIS_ZRANK:
+    case MSG_REQ_REDIS_ZREVRANK:
+    case MSG_REQ_REDIS_ZSCORE:
         return true;
 
     default:
@@ -52,26 +106,34 @@ parse_arg1(struct msg *r)
     return false;
 }
 
+/*
+ * Return true, if the redis command accepts exactly 2 arguments, otherwise
+ * return false
+ */
 static bool
 parse_arg2(struct msg *r)
 {
     switch (r->type) {
-    case MSG_REQ_REDIS_SET:
-    case MSG_REQ_REDIS_HGET:
-    case MSG_REQ_REDIS_MOVE:
-    case MSG_REQ_REDIS_SETNX:
-    case MSG_REQ_REDIS_APPEND:
-    case MSG_REQ_REDIS_DECRBY:
-    case MSG_REQ_REDIS_EXPIRE:
-    case MSG_REQ_REDIS_GETBIT:
-    case MSG_REQ_REDIS_GETSET:
-    case MSG_REQ_REDIS_INCRBY:
-    case MSG_REQ_REDIS_LINDEX:
-    case MSG_REQ_REDIS_LPUSHX:
-    case MSG_REQ_REDIS_RPUSHX:
-    case MSG_REQ_REDIS_HEXISTS:
-    case MSG_REQ_REDIS_EXPIREAT:
-    case MSG_REQ_REDIS_SISMEMBER:
+    case MSG_REQ_REDIS_GETRANGE:
+    case MSG_REQ_REDIS_PSETEX:
+    case MSG_REQ_REDIS_SETBIT:
+    case MSG_REQ_REDIS_SETEX:
+    case MSG_REQ_REDIS_SETRANGE:
+
+    case MSG_REQ_REDIS_HINCRBY:
+    case MSG_REQ_REDIS_HINCRBYFLOAT:
+    case MSG_REQ_REDIS_HSET:
+    case MSG_REQ_REDIS_HSETNX:
+
+    case MSG_REQ_REDIS_LRANGE:
+    case MSG_REQ_REDIS_LREM:
+    case MSG_REQ_REDIS_LSET:
+    case MSG_REQ_REDIS_LTRIM:
+
+    case MSG_REQ_REDIS_ZCOUNT:
+    case MSG_REQ_REDIS_ZINCRBY:
+    case MSG_REQ_REDIS_ZREMRANGEBYRANK:
+    case MSG_REQ_REDIS_ZREMRANGEBYSCORE:
         return true;
 
     default:
@@ -81,35 +143,14 @@ parse_arg2(struct msg *r)
     return false;
 }
 
+/*
+ * Return true, if the redis command accepts exactly 3 arguments, otherwise
+ * return false
+ */
 static bool
 parse_arg3(struct msg *r)
 {
     switch (r->type) {
-    case MSG_REQ_REDIS_HSET:
-    case MSG_REQ_REDIS_LREM:
-    case MSG_REQ_REDIS_LSET:
-    case MSG_REQ_REDIS_LTRIM:
-    case MSG_REQ_REDIS_SETEX:
-    case MSG_REQ_REDIS_HSETNX:
-    case MSG_REQ_REDIS_LRANGE:
-    case MSG_REQ_REDIS_SETBIT:
-    case MSG_REQ_REDIS_HINCRBY:
-    case MSG_REQ_REDIS_GETRANGE:
-    case MSG_REQ_REDIS_SETRANGE:
-        return true;
-
-    default:
-        break;
-    }
-
-    return false;
-}
-
-static bool
-parse_arg4(struct msg *r)
-{
-    switch (r->type) {
-        /* FIXME */
     case MSG_REQ_REDIS_LINSERT:
         return true;
 
@@ -118,17 +159,33 @@ parse_arg4(struct msg *r)
     }
     return false;
 }
+
+/*
+ * Return true, if the redis command accepts 0 or more arguments, otherwise
+ * return false
+ */
 static bool
 parse_argn(struct msg *r)
 {
     switch (r->type) {
+    case MSG_REQ_REDIS_BITCOUNT:
+
     case MSG_REQ_REDIS_HDEL:
-    case MSG_REQ_REDIS_SADD:
-    case MSG_REQ_REDIS_SREM:
     case MSG_REQ_REDIS_HMGET:
     case MSG_REQ_REDIS_HMSET:
+
     case MSG_REQ_REDIS_LPUSH:
     case MSG_REQ_REDIS_RPUSH:
+
+    case MSG_REQ_REDIS_SADD:
+    case MSG_REQ_REDIS_SREM:
+
+    case MSG_REQ_REDIS_ZADD:
+    case MSG_REQ_REDIS_ZRANGE:
+    case MSG_REQ_REDIS_ZRANGEBYSCORE:
+    case MSG_REQ_REDIS_ZREM:
+    case MSG_REQ_REDIS_ZREVRANGE:
+    case MSG_REQ_REDIS_ZREVRANGEBYSCORE:
         return true;
 
     default:
@@ -203,6 +260,10 @@ parse_request(struct msg *r)
         SW_ARG2_LEN_LF,
         SW_ARG2,
         SW_ARG2_LF,
+        SW_ARG3_LEN,
+        SW_ARG3_LEN_LF,
+        SW_ARG3,
+        SW_ARG3_LF,
         SW_ARGN_LEN,
         SW_ARGN_LEN_LF,
         SW_ARGN,
@@ -236,7 +297,7 @@ parse_request(struct msg *r)
                 }
                 r->token = p;
                 /* req_start <- p */
-                r->narg_start = p + 1;
+                r->narg_start = p;
                 r->rnarg = 0;
                 state = SW_NARG;
             } else if (isdigit(ch)) {
@@ -349,6 +410,11 @@ parse_request(struct msg *r)
                 break;
 
             case 4:
+                if (str4icmp(m, 'p', 't', 't', 'l')) {
+                    r->type = MSG_REQ_REDIS_PTTL;
+                    break;
+                }
+
                 if (str4icmp(m, 'd', 'e', 'c', 'r')) {
                     r->type = MSG_REQ_REDIS_DECR;
                     break;
@@ -399,11 +465,6 @@ parse_request(struct msg *r)
                     break;
                 }
 
-                if (str4icmp(m, 'm', 'o', 'v', 'e')) {
-                    r->type = MSG_REQ_REDIS_MOVE;
-                    break;
-                }
-
                 if (str4icmp(m, 'r', 'p', 'o', 'p')) {
                     r->type = MSG_REQ_REDIS_RPOP;
                     break;
@@ -431,6 +492,16 @@ parse_request(struct msg *r)
 
                 if (str4icmp(m, 'm', 'g', 'e', 't')) {
                     r->type = MSG_REQ_REDIS_MGET;
+                    break;
+                }
+
+                if (str4icmp(m, 'z', 'a', 'd', 'd')) {
+                    r->type = MSG_REQ_REDIS_ZADD;
+                    break;
+                }
+
+                if (str4icmp(m, 'z', 'r', 'e', 'm')) {
+                    r->type = MSG_REQ_REDIS_ZREM;
                     break;
                 }
 
@@ -487,6 +558,16 @@ parse_request(struct msg *r)
                     break;
                 }
 
+                if (str5icmp(m, 'z', 'c', 'a', 'r', 'd')) {
+                    r->type = MSG_REQ_REDIS_ZCARD;
+                    break;
+                }
+
+                if (str5icmp(m, 'z', 'r', 'a', 'n', 'k')) {
+                    r->type = MSG_REQ_REDIS_ZRANK;
+                    break;
+                }
+
                 break;
 
             case 6:
@@ -517,6 +598,11 @@ parse_request(struct msg *r)
 
                 if (str6icmp(m, 'g', 'e', 't', 's', 'e', 't')) {
                     r->type = MSG_REQ_REDIS_GETSET;
+                    break;
+                }
+
+                if (str6icmp(m, 'p', 's', 'e', 't', 'e', 'x')) {
+                    r->type = MSG_REQ_REDIS_PSETEX;
                     break;
                 }
 
@@ -560,9 +646,34 @@ parse_request(struct msg *r)
                     break;
                 }
 
+                if (str6icmp(m, 'z', 'c', 'o', 'u', 'n', 't')) {
+                    r->type = MSG_REQ_REDIS_ZCOUNT;
+                    break;
+                }
+
+                if (str6icmp(m, 'z', 'r', 'a', 'n', 'g', 'e')) {
+                    r->type = MSG_REQ_REDIS_ZRANGE;
+                    break;
+                }
+
+                if (str6icmp(m, 'z', 's', 'c', 'o', 'r', 'e')) {
+                    r->type = MSG_REQ_REDIS_ZSCORE;
+                    break;
+                }
+
                 break;
 
             case 7:
+                if (str7icmp(m, 'p', 'e', 'r', 's', 'i', 's', 't')) {
+                    r->type = MSG_REQ_REDIS_PERSIST;
+                    break;
+                }
+
+                if (str7icmp(m, 'p', 'e', 'x', 'p', 'i', 'r', 'e')) {
+                    r->type = MSG_REQ_REDIS_PEXPIRE;
+                    break;
+                }
+
                 if (str7icmp(m, 'h', 'e', 'x', 'i', 's', 't', 's')) {
                     r->type = MSG_REQ_REDIS_HEXISTS;
                     break;
@@ -583,8 +694,8 @@ parse_request(struct msg *r)
                     break;
                 }
 
-                if (str7icmp(m, 'p', 'e', 'r', 's', 'i', 's', 't')) {
-                    r->type = MSG_REQ_REDIS_PERSIST;
+                if (str7icmp(m, 'z', 'i', 'n', 'c', 'r', 'b', 'y')) {
+                    r->type = MSG_REQ_REDIS_ZINCRBY;
                     break;
                 }
 
@@ -593,6 +704,11 @@ parse_request(struct msg *r)
             case 8:
                 if (str8icmp(m, 'e', 'x', 'p', 'i', 'r', 'e', 'a', 't')) {
                     r->type = MSG_REQ_REDIS_EXPIREAT;
+                    break;
+                }
+
+                if (str8icmp(m, 'b', 'i', 't', 'c', 'o', 'u', 'n', 't')) {
+                    r->type = MSG_REQ_REDIS_BITCOUNT;
                     break;
                 }
 
@@ -611,19 +727,77 @@ parse_request(struct msg *r)
                     break;
                 }
 
+                if (str8icmp(m, 'z', 'r', 'e', 'v', 'r', 'a', 'n', 'k')) {
+                    r->type = MSG_REQ_REDIS_ZREVRANK;
+                    break;
+                }
+
                 break;
 
             case 9:
+                if (str9icmp(m, 'p', 'e', 'x', 'p', 'i', 'r', 'e', 'a', 't')) {
+                    r->type = MSG_REQ_REDIS_PEXPIREAT;
+                    break;
+                }
 
                 if (str9icmp(m, 's', 'i', 's', 'm', 'e', 'm', 'b', 'e', 'r')) {
                     r->type = MSG_REQ_REDIS_SISMEMBER;
                     break;
                 }
 
+                if (str9icmp(m, 'z', 'r', 'e', 'v', 'r', 'a', 'n', 'g', 'e')) {
+                    r->type = MSG_REQ_REDIS_ZREVRANGE;
+                    break;
+                }
+
+                break;
+
             case 11:
+                if (str11icmp(m, 'i', 'n', 'c', 'r', 'b', 'y', 'f', 'l', 'o', 'a', 't')) {
+                    r->type = MSG_REQ_REDIS_INCRBYFLOAT;
+                    break;
+                }
 
                 if (str11icmp(m, 's', 'r', 'a', 'n', 'd', 'm', 'e', 'm', 'b', 'e', 'r')) {
                     r->type = MSG_REQ_REDIS_SRANDMEMBER;
+                    break;
+                }
+
+                break;
+
+            case 12:
+                if (str12icmp(m, 'h', 'i', 'n', 'c', 'r', 'b', 'y', 'f', 'l', 'o', 'a', 't')) {
+                    r->type = MSG_REQ_REDIS_HINCRBYFLOAT;
+                    break;
+                }
+
+
+                break;
+
+            case 13:
+                if (str13icmp(m, 'z', 'r', 'a', 'n', 'g', 'e', 'b', 'y', 's', 'c', 'o', 'r', 'e')) {
+                    r->type = MSG_REQ_REDIS_ZRANGEBYSCORE;
+                    break;
+                }
+
+                break;
+
+            case 15:
+                if (str15icmp(m, 'z', 'r', 'e', 'm', 'r', 'a', 'n', 'g', 'e', 'b', 'y', 'r', 'a', 'n', 'k')) {
+                    r->type = MSG_REQ_REDIS_ZREMRANGEBYRANK;
+                    break;
+                }
+
+                break;
+
+            case 16:
+                if (str16icmp(m, 'z', 'r', 'e', 'm', 'r', 'a', 'n', 'g', 'e', 'b', 'y', 's', 'c', 'o', 'r', 'e')) {
+                    r->type = MSG_REQ_REDIS_ZREMRANGEBYSCORE;
+                    break;
+                }
+
+                if (str16icmp(m, 'z', 'r', 'e', 'v', 'r', 'a', 'n', 'g', 'e', 'b', 'y', 's', 'c', 'o', 'r', 'e')) {
+                    r->type = MSG_REQ_REDIS_ZREVRANGEBYSCORE;
                     break;
                 }
 
@@ -634,8 +808,11 @@ parse_request(struct msg *r)
             }
 
             if (r->type == MSG_UNKNOWN) {
+                log_error("parsed unsupported command '%.*s'", p - m, m);
                 goto error;
             }
+
+            log_debug(LOG_VERB, "parsed command '%.*s'", p - m, m);
 
             state = SW_REQ_TYPE_LF;
             break;
@@ -662,7 +839,15 @@ parse_request(struct msg *r)
             } else if (isdigit(ch)) {
                 r->rlen = r->rlen * 10 + (uint32_t)(ch - '0');
             } else if (ch == CR) {
-                if (r->rlen == 0 || r->rnarg == 0) {
+                if (r->rlen == 0) {
+                    log_error("rejecting command with empty key");
+                    goto error;
+                }
+                if (r->rlen > 512) {
+                    log_error("reject command with long key");
+                    goto error;
+                }
+                if (r->rnarg == 0) {
                     goto error;
                 }
                 r->rnarg--;
@@ -702,7 +887,7 @@ parse_request(struct msg *r)
                 goto error;
             }
 
-            p += r->rlen; /* move forward by rlen bytes */
+            p = m; /* move forward by rlen bytes */
             r->rlen = 0;
             m = r->token;
             r->token = NULL;
@@ -717,35 +902,35 @@ parse_request(struct msg *r)
         case SW_KEY_LF:
             switch (ch) {
             case LF:
-                if (parse_arg1(r)) {
+                if (parse_arg0(r)) {
                     if (r->rnarg != 0) {
                         goto error;
                     }
-
                     goto done;
-                } else if (parse_arg2(r)) {
+                } else if (parse_arg1(r)) {
                     if (r->rnarg != 1) {
                         goto error;
                     }
-
                     state = SW_ARG1_LEN;
-                } else if (parse_arg3(r)) {
+                } else if (parse_arg2(r)) {
                     if (r->rnarg != 2) {
                         goto error;
                     }
-
                     state = SW_ARG1_LEN;
-                } else if (parse_argn(r)) {
-                    if (r->rnarg < 1) {
+                } else if (parse_arg3(r)) {
+                    if (r->rnarg != 3) {
                         goto error;
                     }
-
+                    state = SW_ARG1_LEN;
+                } else if (parse_argn(r)) {
+                    if (r->rnarg == 0) {
+                        goto done;
+                    }
                     state = SW_ARG1_LEN;
                 } else if (parse_argx(r)) {
                     if (r->rnarg == 0) {
                         goto done;
                     }
-
                     state = SW_FRAGMENT;
                 } else {
                     goto error;
@@ -820,13 +1005,18 @@ parse_request(struct msg *r)
         case SW_ARG1_LF:
             switch (ch) {
             case LF:
-                if (parse_arg2(r)) {
+                if (parse_arg1(r)) {
                     if (r->rnarg != 0) {
                         goto error;
                     }
                     goto done;
-                } else if (parse_arg3(r)) {
+                } else if (parse_arg2(r)) {
                     if (r->rnarg != 1) {
+                        goto error;
+                    }
+                    state = SW_ARG2_LEN;
+                } else if (parse_arg3(r)) {
+                    if (r->rnarg != 2) {
                         goto error;
                     }
                     state = SW_ARG2_LEN;
@@ -901,6 +1091,89 @@ parse_request(struct msg *r)
             break;
 
         case SW_ARG2_LF:
+            switch (ch) {
+            case LF:
+                if (parse_arg2(r)) {
+                    if (r->rnarg != 0) {
+                        goto error;
+                    }
+                    goto done;
+                } else if (parse_arg3(r)) {
+                    if (r->rnarg != 1) {
+                        goto error;
+                    }
+                    state = SW_ARG3_LEN;
+                } else if (parse_argn(r)) {
+                    if (r->rnarg == 0) {
+                        goto done;
+                    }
+                    state = SW_ARGN_LEN;
+                } else {
+                    goto error;
+                }
+
+                break;
+
+            default:
+                goto error;
+            }
+
+            break;
+
+        case SW_ARG3_LEN:
+            if (r->token == NULL) {
+                if (ch != '$') {
+                    goto error;
+                }
+                r->rlen = 0;
+                r->token = p;
+            } else if (isdigit(ch)) {
+                r->rlen = r->rlen * 10 + (uint32_t)(ch - '0');
+            } else if (ch == CR) {
+                if ((p - r->token) <= 1 || r->rnarg == 0) {
+                    goto error;
+                }
+                r->rnarg--;
+                r->token = NULL;
+                state = SW_ARG3_LEN_LF;
+            } else {
+                goto error;
+            }
+
+            break;
+
+        case SW_ARG3_LEN_LF:
+            switch (ch) {
+            case LF:
+                state = SW_ARG3;
+                break;
+
+            default:
+                goto error;
+            }
+
+            break;
+
+        case SW_ARG3:
+            m = p + r->rlen;
+            if (m >= b->last) {
+                r->rlen -= (uint32_t)(b->last - p);
+                m = b->last - 1;
+                p = m;
+                break;
+            }
+
+            if (*m != CR) {
+                goto error;
+            }
+
+            p = m; /* move forward by rlen bytes */
+            r->rlen = 0;
+            state = SW_ARG3_LF;
+
+            break;
+
+        case SW_ARG3_LF:
             switch (ch) {
             case LF:
                 if (parse_arg3(r)) {
@@ -1017,11 +1290,9 @@ parse_request(struct msg *r)
         r->result = PARSE_AGAIN;
     }
 
-    log_debug(LOG_INFO, "parsed req %"PRIu64" res %d type %d state %d "
-              "rpos %d of %d '%s'", r->id, r->result, r->type, r->state,
-              r->pos - b->pos, b->last - b->pos);
-    log_hexdump(LOG_INFO, b->pos, b->last - b->pos, "");
-
+    log_hexdump(LOG_VERB, b->pos, mbuf_length(b), "parsed req %"PRIu64" res %d "
+                "type %d state %d rpos %d of %d", r->id, r->result, r->type,
+                r->state, r->pos - b->pos, b->last - b->pos);
     return;
 
 fragment:
@@ -1032,11 +1303,9 @@ fragment:
     r->state = state;
     r->result = PARSE_FRAGMENT;
 
-    log_debug(LOG_INFO, "parsed req %"PRIu64" res %d type %d state %d "
-              "rpos %d of %d", r->id, r->result, r->type, r->state,
-              r->pos - b->pos, b->last - b->pos);
-    log_hexdump(LOG_INFO, b->pos, b->last - b->pos, "");
-
+    log_hexdump(LOG_VERB, b->pos, mbuf_length(b), "parsed req %"PRIu64" res %d "
+               "type %d state %d rpos %d of %d", r->id, r->result, r->type,
+               r->state, r->pos - b->pos, b->last - b->pos);
     return;
 
 done:
@@ -1047,11 +1316,9 @@ done:
     r->token = NULL;
     r->result = PARSE_OK;
 
-    log_debug(LOG_INFO, "parsed req %"PRIu64" res %d type %d state %d "
-              "rpos %d of %d", r->id, r->result, r->type, r->state,
-              r->pos - b->pos, b->last - b->pos);
-    log_hexdump(LOG_INFO, b->pos, b->last - b->pos, "");
-
+    log_hexdump(LOG_VERB, b->pos, mbuf_length(b), "parsed req %"PRIu64" res %d "
+                "type %d state %d rpos %d of %d", r->id, r->result, r->type,
+                r->state, r->pos - b->pos, b->last - b->pos);
     return;
 
 error:
@@ -1059,9 +1326,9 @@ error:
     r->state = state;
     errno = EINVAL;
 
-    log_debug(LOG_INFO, "parsed bad req %"PRIu64" res %d type %d state %d",
-              r->id, r->result, r->type, r->state);
-    log_hexdump(LOG_INFO, b->pos, b->last - b->pos, "");
+    log_hexdump(LOG_INFO, b->pos, mbuf_length(b), "parsed bad req %"PRIu64" "
+                "res %d type %d state %d", r->id, r->result, r->type,
+                r->state);
 }
 
 /*
@@ -1103,6 +1370,7 @@ parse_response(struct msg *r)
         SW_STATUS,
         SW_ERROR,
         SW_INTEGER,
+        SW_INTEGER_START,
         SW_BULK,
         SW_BULK_LF,
         SW_BULK_ARG,
@@ -1185,7 +1453,20 @@ parse_response(struct msg *r)
 
         case SW_INTEGER:
             /* rsp_start <- p */
-            state = SW_RUNTO_CRLF;
+            state = SW_INTEGER_START;
+            r->integer = 0;
+            break;
+
+        case SW_INTEGER_START:
+            if (ch == CR) {
+                state = SW_ALMOST_DONE;
+            } else if (ch == '-') {
+                ;
+            } else if (isdigit(ch)) {
+                r->integer = r->integer * 10 + (uint32_t)(ch - '0');
+            } else {
+                goto error;
+            }
             break;
 
         case SW_RUNTO_CRLF:
@@ -1286,7 +1567,7 @@ parse_response(struct msg *r)
                 }
                 r->token = p;
                 /* rsp_start <- p */
-                r->narg_start = p + 1;
+                r->narg_start = p;
                 r->rnarg = 0;
             } else if (isdigit(ch)) {
                 r->rnarg = r->rnarg * 10 + (uint32_t)(ch - '0');
@@ -1420,11 +1701,9 @@ parse_response(struct msg *r)
         r->result = PARSE_AGAIN;
     }
 
-    log_debug(LOG_INFO, "parsed rsp %"PRIu64" res %d type %d state %d "
-              "rpos %d of %d", r->id, r->result, r->type, r->state,
-              r->pos - b->pos, b->last - b->pos);
-    log_hexdump(LOG_INFO, b->pos, b->last - b->pos, "");
-
+    log_hexdump(LOG_VERB, b->pos, mbuf_length(b), "parsed rsp %"PRIu64" res %d "
+                "type %d state %d rpos %d of %d", r->id, r->result, r->type,
+                r->state, r->pos - b->pos, b->last - b->pos);
     return;
 
 done:
@@ -1435,11 +1714,9 @@ done:
     r->token = NULL;
     r->result = PARSE_OK;
 
-    log_debug(LOG_INFO, "parsed rsp %"PRIu64" res %d type %d state %d "
-              "rpos %d of %d", r->id, r->result, r->type, r->state,
-              r->pos - b->pos, b->last - b->pos);
-    log_hexdump(LOG_INFO, b->pos, b->last - b->pos, "");
-
+    log_hexdump(LOG_VERB, b->pos, mbuf_length(b), "parsed rsp %"PRIu64" res %d "
+                "type %d state %d rpos %d of %d", r->id, r->result, r->type,
+                r->state, r->pos - b->pos, b->last - b->pos);
     return;
 
 error:
@@ -1447,7 +1724,7 @@ error:
     r->state = state;
     errno = EINVAL;
 
-    log_debug(LOG_INFO, "parsed bad rsp %"PRIu64" res %d type %d state %d",
-              r->id, r->result, r->type, r->state);
-    log_hexdump(LOG_INFO, b->pos, b->last - b->pos, "");
+    log_hexdump(LOG_INFO, b->pos, mbuf_length(b), "parsed bad rsp %"PRIu64" "
+                "res %d type %d state %d", r->id, r->result, r->type,
+                r->state);
 }

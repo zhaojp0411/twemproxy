@@ -109,6 +109,10 @@
  * server.
  */
 
+static struct string MCOPY_NIL = string("");
+static struct string MCOPY_MGET = string("*0\r\n$4\r\nmget\r\n");
+static struct string MCOPY_DEL = string("*0\r\n$3\r\ndel\r\n");
+
 static uint64_t msg_id;          /* message id counter */
 static uint64_t frag_id;         /* fragment id counter */
 static uint32_t nfree_msgq;      /* # free msg q */
@@ -235,6 +239,8 @@ done:
     msg->frag_owner = NULL;
     msg->nfrag = 0;
     msg->frag_id = 0;
+
+    msg->integer = 0;
 
     msg->err = 0;
     msg->error = 0;
@@ -400,7 +406,7 @@ msg_parsed(struct context *ctx, struct conn *conn, struct msg *msg)
      * been parsed and nbuf is the portion of the message that is un-parsed.
      * Parse nbuf as a new message nmsg in the next iteration.
      */
-    nbuf = mbuf_split(&msg->mhdr, msg->pos, MCOPY_NIL, MCOPY_NIL);
+    nbuf = mbuf_split(&msg->mhdr, msg->pos, &MCOPY_NIL, &MCOPY_NIL);
     if (nbuf == NULL) {
         return NC_ENOMEM;
     }
@@ -422,26 +428,77 @@ msg_parsed(struct context *ctx, struct conn *conn, struct msg *msg)
     return NC_OK;
 }
 
+static struct string *
+msg_mget_string(struct msg *msg)
+{
+    /* FIXME: this is horrible */
+    static char buf[1024];
+    int n;
+    static struct string str;
+
+    ASSERT(msg->narg > 1);
+
+    /*
+     * make the string that is part of the tailcopy, i.e. gets copied
+     * to the head mbuf of the tail msg
+     *
+     * I wonder if we can just generate static literal strings; i don't think that is
+     * possible, because we would have to generate %d, for every possible integer
+     *
+     * So, the next thing I wonder if we can modify tailcopy, so that we directly
+     * copy into mbuf based on a function, rather than copying into a temporary
+     * mbuf and then doing the copy
+     *
+     */
+
+    n = nc_snprintf(buf, 1024, "*%d\r\n$4\r\nmget\r\n", msg->narg - 1);
+
+    str.data = (uint8_t *)&buf;
+    str.len = (uint32_t)n;
+
+    return &str;
+}
+
+static struct string *
+msg_del_string(struct msg *msg)
+{
+    static char buf[1024];
+    int n;
+    static struct string str;
+
+    ASSERT(msg->narg > 1);
+
+    n = nc_snprintf(buf, 1024, "*%d\r\n$3\r\ndel\r\n", msg->narg - 1);
+
+    str.data = (uint8_t *)&buf;
+    str.len = (uint32_t)n;
+
+    return &str;
+}
+
 static rstatus_t
 msg_fragment(struct context *ctx, struct conn *conn, struct msg *msg)
 {
     struct msg *nmsg;
     struct mbuf *nbuf;
-    mcopy_type_t headcopy, tailcopy;
+    struct string *headcopy, *tailcopy;
 
     ASSERT(conn->client && !conn->proxy);
     ASSERT(msg->request);
 
     switch (msg->type) {
     case MSG_REQ_REDIS_MGET:
-        headcopy = MCOPY_MGET;
-        tailcopy = MCOPY_NIL;
+        headcopy = msg_mget_string(msg);
+        tailcopy = &MCOPY_NIL;
+        break;
+
+    case MSG_REQ_REDIS_DEL:
+        headcopy = msg_del_string(msg);
+        tailcopy = &MCOPY_NIL;
         break;
 
     default:
         NOT_REACHED();
-        headcopy = MCOPY_NIL;
-        tailcopy = MCOPY_NIL;
         break;
     }
 
@@ -450,48 +507,36 @@ msg_fragment(struct context *ctx, struct conn *conn, struct msg *msg)
         return NC_ENOMEM;
     }
 
-    /*
-     * msg_post_split_repair()
-     *
-     * redis_head_copy
-     * redis_tail_copy
-     *
-     */
-    if (msg->type == MSG_REQ_REDIS_MGET) {
-        struct mbuf *mbuf = STAILQ_LAST(&msg->mhdr, mbuf, next);
+    // msg_post_split_repair() -- redis_head_copy, redis_tail_copy
+    if (msg->type == MSG_REQ_REDIS_MGET || msg->type == MSG_REQ_REDIS_DEL) {
+        struct mbuf *hbuf, *nhbuf; /* head and new head mbuf */
 
-        /* FIX THE head MBUF in the HEAD MESSAGE */
-        {
-            /* ADD the MULTI-BULK header *<len>\r\n */
-            char num[NC_UINTMAX_MAXLEN];
-            int n;
-            int len = msg->narg_end - msg->narg_start;
+        /*
+         * Fix/Repair the head mbuf in the head (A) msg. The fix is fairly
+         * staright forward as we just need to skip over the narg token
+         */
+        hbuf = STAILQ_FIRST(&msg->mhdr);
+        ASSERT(hbuf != NULL);
+        ASSERT(hbuf->pos ==  msg->narg_start);
+        ASSERT(hbuf->pos < msg->narg_end && msg->narg_end <= hbuf->last);
+        hbuf->pos = msg->narg_end;
 
-            ASSERT(len > 0);
+        /*
+         * Add a new head mbuf in the head (A) msg that just contains '*2'
+         * token
+         */
+        nhbuf = mbuf_get();
+        ASSERT(nhbuf != NULL);
+        STAILQ_INSERT_HEAD(&msg->mhdr, nhbuf, next);
 
-            n = nc_snprintf(num, sizeof(num), "%"PRIu32"", 2);
-            ASSERT(n == 1);
+        mbuf_copy(nhbuf, (uint8_t *)"*2", sizeof("*2") - 1);
 
-            //if (len > (n - 1)) {
-            //    n = nc_snprintf(num, sizeof(num), "*%0*"PRIu32"", len, 2);
-            //}
+        /* fix up the narg_start and narg_end pointers */
+        msg->narg_start = nhbuf->pos;
+        msg->narg_end = nhbuf->last;
 
-            nc_memcpy(msg->narg_start, num, n);
-            log_hexdump(LOG_INFO, mbuf->pos, mbuf->last - mbuf->pos, "head mbuf: ");
-        }
-
-
-        /* FIX THE head MBUF in the TAIL MESSAGE */
-        {
-            char num[NC_UINTMAX_MAXLEN];
-            int n;
-
-            memset(num, '0', sizeof(num));
-            n = nc_snprintf(num, sizeof(num), "*%"PRIu32"", msg->narg - 1);
-
-            nc_memcpy(nbuf->pos, num, n);
-            log_hexdump(LOG_INFO, nbuf->pos, nbuf->last - nbuf->pos, "tail mbuf:");
-        }
+        log_hexdump(LOG_INFO, nhbuf->pos, mbuf_length(nhbuf), "nhbuf: ");
+        log_hexdump(LOG_INFO, hbuf->pos, mbuf_length(hbuf), "hbuf: ");
     }
 
     nmsg = msg_get(msg->owner, msg->request);
@@ -537,7 +582,7 @@ msg_repair(struct context *ctx, struct conn *conn, struct msg *msg)
 {
     struct mbuf *nbuf;
 
-    nbuf = mbuf_split(&msg->mhdr, msg->pos, MCOPY_NIL, MCOPY_NIL);
+    nbuf = mbuf_split(&msg->mhdr, msg->pos, &MCOPY_NIL, &MCOPY_NIL);
     if (nbuf == NULL) {
         return NC_ENOMEM;
     }
@@ -583,7 +628,7 @@ msg_parse(struct context *ctx, struct conn *conn, struct msg *msg)
         break;
     }
 
-    return conn->err != 0 ? NC_ERROR : status;
+    return status;
 }
 
 static rstatus_t
@@ -743,6 +788,10 @@ msg_send_chain(struct context *ctx, struct conn *conn, struct msg *msg)
         TAILQ_REMOVE(&send_msgq, msg, m_tqe);
 
         if (nsent == 0) {
+            /* do this in a generic manner */
+            if (msg->mlen == 0) {
+                conn->send_done(ctx, conn, msg);
+            }
             continue;
         }
 
