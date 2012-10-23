@@ -587,7 +587,7 @@ msg_repair(struct context *ctx, struct conn *conn, struct msg *msg)
         return NC_ENOMEM;
     }
     mbuf_insert(&msg->mhdr, nbuf);
-    msg->pos = nbuf->last;
+    msg->pos = nbuf->pos;
 
     return NC_OK;
 }
@@ -649,7 +649,6 @@ msg_recv_chain(struct context *ctx, struct conn *conn, struct msg *msg)
         mbuf_insert(&msg->mhdr, mbuf);
         msg->pos = mbuf->pos;
     }
-    ASSERT(msg->pos == mbuf->last);
     ASSERT(mbuf->end - mbuf->last > 0);
 
     msize = mbuf_size(mbuf);
