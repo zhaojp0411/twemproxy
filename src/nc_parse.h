@@ -161,4 +161,6 @@ typedef enum parse_result {
 void parse_request(struct msg *r);
 void parse_response(struct msg *r);
 
+void redis_fixup(struct msg *msg);
+
 #endif

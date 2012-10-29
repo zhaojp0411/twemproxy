@@ -34,7 +34,6 @@
     ACTION( fragments,              STATS_COUNTER )     \
 
 #define STATS_SERVER_CODEC(ACTION)                      \
-    ACTION( noreply,                STATS_COUNTER )     \
     /* server behavior */                               \
     ACTION( server_eof,             STATS_COUNTER )     \
     ACTION( server_err,             STATS_COUNTER )     \

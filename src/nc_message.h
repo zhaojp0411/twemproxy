@@ -24,7 +24,6 @@ typedef void (*msg_parse_t)(struct msg *);
 
 typedef enum msg_type {
     MSG_UNKNOWN,
-
     MSG_REQ_REDIS_DEL,           /* redis commands - keys */
     MSG_REQ_REDIS_EXISTS,
     MSG_REQ_REDIS_EXPIRE,
@@ -35,7 +34,6 @@ typedef enum msg_type {
     MSG_REQ_REDIS_PTTL,
     MSG_REQ_REDIS_TTL,
     MSG_REQ_REDIS_TYPE,
-
     MSG_REQ_REDIS_APPEND,        /* redis requests - string */
     MSG_REQ_REDIS_BITCOUNT,
     MSG_REQ_REDIS_DECR,
@@ -55,7 +53,6 @@ typedef enum msg_type {
     MSG_REQ_REDIS_SETNX,
     MSG_REQ_REDIS_SETRANGE,
     MSG_REQ_REDIS_STRLEN,
-
     MSG_REQ_REDIS_HDEL,          /* redis requests - hashes */
     MSG_REQ_REDIS_HEXISTS,
     MSG_REQ_REDIS_HGET,
@@ -69,7 +66,6 @@ typedef enum msg_type {
     MSG_REQ_REDIS_HSET,
     MSG_REQ_REDIS_HSETNX,
     MSG_REQ_REDIS_HVALS,
-
     MSG_REQ_REDIS_LINDEX,        /* redis requests - lists */
     MSG_REQ_REDIS_LINSERT,
     MSG_REQ_REDIS_LLEN,
@@ -83,7 +79,6 @@ typedef enum msg_type {
     MSG_REQ_REDIS_RPOP,
     MSG_REQ_REDIS_RPUSH,
     MSG_REQ_REDIS_RPUSHX,
-
     MSG_REQ_REDIS_SADD,          /* redis requests - sets */
     MSG_REQ_REDIS_SCARD,
     MSG_REQ_REDIS_SISMEMBER,
@@ -91,7 +86,6 @@ typedef enum msg_type {
     MSG_REQ_REDIS_SPOP,
     MSG_REQ_REDIS_SRANDMEMBER,
     MSG_REQ_REDIS_SREM,
-
     MSG_REQ_REDIS_ZADD,          /* redis requests - sorted sets */
     MSG_REQ_REDIS_ZCARD,
     MSG_REQ_REDIS_ZCOUNT,
@@ -106,7 +100,6 @@ typedef enum msg_type {
     MSG_REQ_REDIS_ZREVRANGEBYSCORE,
     MSG_REQ_REDIS_ZREVRANK,
     MSG_REQ_REDIS_ZSCORE,
-
     MSG_RSP_REDIS_STATUS,        /* redis response */
     MSG_RSP_REDIS_ERROR,
     MSG_RSP_REDIS_INTEGER,

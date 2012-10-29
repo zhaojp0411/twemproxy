@@ -182,33 +182,12 @@ rsp_filter(struct context *ctx, struct conn *conn, struct msg *msg)
 }
 
 static void
-rsp_forward_stats(struct context *ctx, struct msg *msg, struct conn *s_conn,
-                  struct conn *c_conn)
+rsp_forward_stats(struct context *ctx, struct server *server, struct msg *msg)
 {
-    struct msg *pmsg;
-    struct server *server;
-
-    ASSERT(!s_conn->client && !s_conn->proxy);
-    ASSERT(c_conn->client && !c_conn->proxy);
-    ASSERT(!msg->request && msg->peer != NULL);
-
-    server = s_conn->owner;
-    pmsg = msg->peer;
+    ASSERT(!msg->request);
 
     stats_server_incr(ctx, server, responses);
     stats_server_incr_by(ctx, server, response_bytes, msg->mlen);
-
-    switch (msg->type) {
-    case MSG_RSP_REDIS_STATUS:
-    case MSG_RSP_REDIS_ERROR:
-    case MSG_RSP_REDIS_INTEGER:
-    case MSG_RSP_REDIS_BULK:
-    case MSG_RSP_REDIS_MULTIBULK:
-        break;
-
-    default:
-        NOT_REACHED();
-    }
 }
 
 static void
@@ -236,59 +215,7 @@ rsp_forward(struct context *ctx, struct conn *s_conn, struct msg *msg)
     pmsg->peer = msg;
     msg->peer = pmsg;
 
-    if (pmsg->frag_id != 0) {
-
-        switch (msg->type) {
-        case MSG_RSP_REDIS_INTEGER:
-            /*
-             * Only redis 'del' command is a candidate for fragmentation
-             * and sends back a integer reply.
-             *
-             * Because of how we parse replies, the integer reply will be
-             * completely encpsuated in a single mbuf and we should skip
-             * over all the mbuf contents as the parser has already parsed
-             * and stored reply in msg->integer
-             */
-            mbuf = STAILQ_FIRST(&msg->mhdr);
-
-            ASSERT(pmsg->type == MSG_REQ_REDIS_DEL);
-            ASSERT(mbuf == STAILQ_LAST(&msg->mhdr, mbuf, next));
-            ASSERT(msg->mlen == mbuf_length(mbuf));
-
-            msg->mlen -= mbuf_length(mbuf);
-            mbuf_rewind(mbuf);
-
-            mbuf->pos = mbuf->start;
-            mbuf->last = mbuf->pos;
-
-            break;
-
-        case MSG_RSP_REDIS_MULTIBULK:
-            /*
-             * Only redis 'mget' command is a candidate for fragmentation
-             * and sends back a multi-bulk reply
-             *
-             * The muti-bulk reply can span over multiple mbufs and in each
-             * reply we would like to skip over the narg token.
-             *
-             * Furthermore, because of the way I parse and tokenize replies,
-             * the '\r\n' might not exists in a contiguous region.
-             */
-            mbuf = STAILQ_FIRST(&msg->mhdr);
-            ASSERT(msg->narg_start == mbuf->pos);
-            msg->narg_end += CRLF_LEN;
-            msg->mlen -= (uint32_t) (msg->narg_end - msg->narg_start);
-            mbuf->pos = msg->narg_end;
-            break;
-
-        default:
-            mbuf = STAILQ_FIRST(&msg->mhdr);
-            log_hexdump(LOG_ERR, mbuf->pos, mbuf_length(mbuf), "rsp fragment "
-                        "with unknown type %d", msg->type);
-            pmsg->error = 1;
-            pmsg->err = EINVAL;
-        }
-    }
+    redis_fixup(msg);
 
     c_conn = pmsg->owner;
     ASSERT(c_conn->client && !c_conn->proxy);
@@ -300,7 +227,7 @@ rsp_forward(struct context *ctx, struct conn *s_conn, struct msg *msg)
         }
     }
 
-    rsp_forward_stats(ctx, msg, s_conn, c_conn);
+    rsp_forward_stats(ctx, s_conn->owner, msg);
 }
 
 void

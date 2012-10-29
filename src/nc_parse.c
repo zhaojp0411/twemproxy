@@ -1685,7 +1685,6 @@ parse_response(struct msg *r)
         default:
             NOT_REACHED();
             break;
-
         }
     }
 
@@ -1727,4 +1726,74 @@ error:
     log_hexdump(LOG_INFO, b->pos, mbuf_length(b), "parsed bad rsp %"PRIu64" "
                 "res %d type %d state %d", r->id, r->result, r->type,
                 r->state);
+}
+
+void
+redis_fixup(struct msg *msg)
+{
+    struct msg *pmsg = msg->peer; /* peer request */
+    struct mbuf *mbuf;
+
+    ASSERT(!msg->request);
+    ASSERT(pmsg->request);
+
+    if (pmsg->frag_id == 0) {
+        return;
+    }
+
+    /*
+     * Valid responses for a fragmented requests are MSG_RSP_REDIS_INTEGER or,
+     * MSG_RSP_REDIS_MULTIBULK. For an invalid response, we send out -ERR
+     * with EINVAL errno
+     */
+    if (msg->type != MSG_RSP_REDIS_INTEGER && msg->type != MSG_RSP_REDIS_MULTIBULK) {
+        mbuf = STAILQ_FIRST(&msg->mhdr);
+        log_hexdump(LOG_ERR, mbuf->pos, mbuf_length(mbuf), "rsp fragment "
+                    "with unknown type %d", msg->type);
+        pmsg->error = 1;
+        pmsg->err = EINVAL;
+        return;
+    }
+
+    if (msg->type == MSG_RSP_REDIS_INTEGER) {
+        ASSERT(pmsg->type == MSG_REQ_REDIS_DEL);
+        /*
+         * Only redis 'del' command is a candidate for fragmentation
+         * and sends back a integer reply.
+         *
+         * Because of how we parse replies, the integer reply will be
+         * completely encpsuated in a single mbuf and we should skip
+         * over all the mbuf contents as the parser has already parsed
+         * and stored reply in msg->integer
+         */
+        mbuf = STAILQ_FIRST(&msg->mhdr);
+
+        ASSERT(mbuf == STAILQ_LAST(&msg->mhdr, mbuf, next));
+        ASSERT(msg->mlen == mbuf_length(mbuf));
+
+        msg->mlen -= mbuf_length(mbuf);
+        mbuf_rewind(mbuf);
+
+        mbuf->pos = mbuf->start;
+        mbuf->last = mbuf->pos;
+    }
+
+    if (msg->type == MSG_RSP_REDIS_MULTIBULK) {
+        ASSERT(pmsg->type == MSG_REQ_REDIS_MGET);
+        /*
+         * Only redis 'mget' command is a candidate for fragmentation
+         * and sends back a multi-bulk reply
+         *
+         * The muti-bulk reply can span over multiple mbufs and in each
+         * reply we would like to skip over the narg token.
+         *
+         * Furthermore, because of the way I parse and tokenize replies,
+         * the '\r\n' might not exists in a contiguous region.
+         */
+        mbuf = STAILQ_FIRST(&msg->mhdr);
+        ASSERT(msg->narg_start == mbuf->pos);
+        msg->narg_end += CRLF_LEN;
+        msg->mlen -= (uint32_t) (msg->narg_end - msg->narg_start);
+        mbuf->pos = msg->narg_end;
+    }
 }
