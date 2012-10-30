@@ -1797,3 +1797,46 @@ redis_fixup(struct msg *msg)
         mbuf->pos = msg->narg_end;
     }
 }
+
+rstatus_t
+redis_postcopy_fixup(struct msg *msg)
+{
+    struct mbuf *hbuf, *nhbuf; /* head mbuf and new head mbuf */
+    struct string hstr = string("*2");
+
+    ASSERT(msg->request);
+    ASSERT(msg->type == MSG_REQ_REDIS_MGET || msg->type == MSG_REQ_REDIS_DEL);
+    ASSERT(!STAILQ_EMPTY(&msg->mhdr));
+
+    nhbuf = mbuf_get();
+    if (nhbuf == NULL) {
+        return NC_ENOMEM;
+    }
+
+    /*
+     * Fix/Repair the head mbuf in the head (A) msg. The fix is fairly
+     * staright forward as we just need to skip over the narg token
+     */
+    hbuf = STAILQ_FIRST(&msg->mhdr);
+    ASSERT(hbuf != NULL);
+    ASSERT(hbuf->pos ==  msg->narg_start);
+    ASSERT(hbuf->pos < msg->narg_end && msg->narg_end <= hbuf->last);
+    hbuf->pos = msg->narg_end;
+
+    /*
+     * Add a new head mbuf in the head (A) msg that just contains '*2'
+     * token
+     */
+    STAILQ_INSERT_HEAD(&msg->mhdr, nhbuf, next);
+
+    mbuf_copy(nhbuf, hstr.data, hstr.len);
+
+    /* fix up the narg_start and narg_end */
+    msg->narg_start = nhbuf->pos;
+    msg->narg_end = nhbuf->last;
+
+    log_hexdump(LOG_INFO, nhbuf->pos, mbuf_length(nhbuf), "nhbuf: ");
+    log_hexdump(LOG_INFO, hbuf->pos, mbuf_length(hbuf), "hbuf: ");
+
+    return NC_OK;
+}

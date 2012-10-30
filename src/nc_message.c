@@ -110,8 +110,6 @@
  */
 
 static struct string MCOPY_NIL = string("");
-static struct string MCOPY_MGET = string("*0\r\n$4\r\nmget\r\n");
-static struct string MCOPY_DEL = string("*0\r\n$3\r\ndel\r\n");
 
 static uint64_t msg_id;          /* message id counter */
 static uint64_t frag_id;         /* fragment id counter */
@@ -479,6 +477,7 @@ msg_del_string(struct msg *msg)
 static rstatus_t
 msg_fragment(struct context *ctx, struct conn *conn, struct msg *msg)
 {
+    rstatus_t status;
     struct msg *nmsg;
     struct mbuf *nbuf;
     struct string *headcopy, *tailcopy;
@@ -502,41 +501,30 @@ msg_fragment(struct context *ctx, struct conn *conn, struct msg *msg)
         break;
     }
 
+    /*
+     * typedef void (*mbuf_precopy_t)(void *arg);
+     *
+     * mbuf_split(struct mhdr *h, uint8_t *pos, mbuf_copy_t *cb, void *cbarg)
+     *
+     * memcache_precopy_fixup()
+     * redis_precopy_fixup()
+     *
+     * memcache_postcopy_fixup()
+     * redis_postcopy_fixup()
+     *
+     * msg->precopy_fixup(); msg->precopy()
+     * msg->postcopy_fixup(); msg->postcopy()
+     *
+     */
     nbuf = mbuf_split(&msg->mhdr, msg->pos, headcopy, tailcopy);
     if (nbuf == NULL) {
         return NC_ENOMEM;
     }
 
-    // msg_post_split_repair() -- redis_head_copy, redis_tail_copy
-    if (msg->type == MSG_REQ_REDIS_MGET || msg->type == MSG_REQ_REDIS_DEL) {
-        struct mbuf *hbuf, *nhbuf; /* head and new head mbuf */
-
-        /*
-         * Fix/Repair the head mbuf in the head (A) msg. The fix is fairly
-         * staright forward as we just need to skip over the narg token
-         */
-        hbuf = STAILQ_FIRST(&msg->mhdr);
-        ASSERT(hbuf != NULL);
-        ASSERT(hbuf->pos ==  msg->narg_start);
-        ASSERT(hbuf->pos < msg->narg_end && msg->narg_end <= hbuf->last);
-        hbuf->pos = msg->narg_end;
-
-        /*
-         * Add a new head mbuf in the head (A) msg that just contains '*2'
-         * token
-         */
-        nhbuf = mbuf_get();
-        ASSERT(nhbuf != NULL);
-        STAILQ_INSERT_HEAD(&msg->mhdr, nhbuf, next);
-
-        mbuf_copy(nhbuf, (uint8_t *)"*2", sizeof("*2") - 1);
-
-        /* fix up the narg_start and narg_end pointers */
-        msg->narg_start = nhbuf->pos;
-        msg->narg_end = nhbuf->last;
-
-        log_hexdump(LOG_INFO, nhbuf->pos, mbuf_length(nhbuf), "nhbuf: ");
-        log_hexdump(LOG_INFO, hbuf->pos, mbuf_length(hbuf), "hbuf: ");
+    status = redis_postcopy_fixup(msg);
+    if (status != NC_OK) {
+        mbuf_put(nbuf);
+        return status;
     }
 
     nmsg = msg_get(msg->owner, msg->request);
