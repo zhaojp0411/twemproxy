@@ -367,7 +367,7 @@ parse_request(struct msg *r)
                 r->token = p;
             }
 
-            m = p + r->rlen;
+            m = r->token + r->rlen;
             if (m >= b->last) {
                 m = b->last - 1;
                 p = m;
@@ -876,7 +876,7 @@ parse_request(struct msg *r)
                 r->token = p;
             }
 
-            m = p + r->rlen;
+            m = r->token + r->rlen;
             if (m >= b->last) {
                 m = b->last - 1;
                 p = m;
