@@ -21,6 +21,8 @@
 #include <nc_core.h>
 #include <nc_string.h>
 
+typedef void (*mbuf_copy_t)(struct mbuf *, void *);
+
 struct mbuf {
     uint32_t           magic;   /* mbuf magic (const) */
     STAILQ_ENTRY(mbuf) next;    /* next mbuf */
@@ -60,6 +62,6 @@ uint32_t mbuf_size(struct mbuf *mbuf);
 void mbuf_insert(struct mhdr *mhdr, struct mbuf *mbuf);
 void mbuf_remove(struct mhdr *mhdr, struct mbuf *mbuf);
 void mbuf_copy(struct mbuf *mbuf, uint8_t *pos, size_t n);
-struct mbuf * mbuf_split(struct mhdr *h, uint8_t *pos, struct string *headcopy, struct string *tailcopy);
+struct mbuf *mbuf_split(struct mhdr *h, uint8_t *pos, mbuf_copy_t cb, void *cbarg);
 
 #endif

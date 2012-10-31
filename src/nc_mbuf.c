@@ -209,15 +209,13 @@ mbuf_copy(struct mbuf *mbuf, uint8_t *pos, size_t n)
 
 /*
  * Split mbuf h into h and t by copying data from h to t. Before
- * the copy, we copy a predefined mcopy string (headcopy) to the head
- * of t. After the copy, we copy a predefined mcopy string (tailcopy)
- * to the tail of h.
+ * the copy, we invoke a precopy handler cb that will copy a predefined
+ * string to the head of t.
  *
  * Return new mbuf t, if the split was successful.
  */
 struct mbuf *
-mbuf_split(struct mhdr *h, uint8_t *pos, struct string *headcopy,
-           struct string *tailcopy)
+mbuf_split(struct mhdr *h, uint8_t *pos, mbuf_copy_t cb, void *cbarg)
 {
     struct mbuf *mbuf, *nbuf;
     size_t size;
@@ -232,17 +230,17 @@ mbuf_split(struct mhdr *h, uint8_t *pos, struct string *headcopy,
         return NULL;
     }
 
-    /* headcopy - copy data from mbuf to nbuf */
-    mbuf_copy(nbuf, headcopy->data, headcopy->len);
+    if (cb != NULL) {
+        /* precopy nbuf */
+        cb(nbuf, cbarg);
+    }
 
+    /* copy data from mbuf to nbuf */
     size = (size_t)(mbuf->last - pos);
     mbuf_copy(nbuf, pos, size);
 
     /* adjust mbuf */
     mbuf->last = pos;
-
-    /* tailcopy - copy data to mbuf */
-    mbuf_copy(mbuf, tailcopy->data, tailcopy->len);
 
     log_debug(LOG_VVERB, "split into mbuf %p len %"PRIu32" and nbuf %p len "
               "%"PRIu32" copied %zu bytes", mbuf, mbuf_length(mbuf), nbuf,

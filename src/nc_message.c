@@ -109,8 +109,6 @@
  * server.
  */
 
-static struct string MCOPY_NIL = string("");
-
 static uint64_t msg_id;          /* message id counter */
 static uint64_t frag_id;         /* fragment id counter */
 static uint32_t nfree_msgq;      /* # free msg q */
@@ -404,7 +402,7 @@ msg_parsed(struct context *ctx, struct conn *conn, struct msg *msg)
      * been parsed and nbuf is the portion of the message that is un-parsed.
      * Parse nbuf as a new message nmsg in the next iteration.
      */
-    nbuf = mbuf_split(&msg->mhdr, msg->pos, &MCOPY_NIL, &MCOPY_NIL);
+    nbuf = mbuf_split(&msg->mhdr, msg->pos, NULL, NULL);
     if (nbuf == NULL) {
         return NC_ENOMEM;
     }
@@ -426,97 +424,26 @@ msg_parsed(struct context *ctx, struct conn *conn, struct msg *msg)
     return NC_OK;
 }
 
-static struct string *
-msg_mget_string(struct msg *msg)
-{
-    /* FIXME: this is horrible */
-    static char buf[1024];
-    int n;
-    static struct string str;
-
-    ASSERT(msg->narg > 1);
-
-    /*
-     * make the string that is part of the tailcopy, i.e. gets copied
-     * to the head mbuf of the tail msg
-     *
-     * I wonder if we can just generate static literal strings; i don't think that is
-     * possible, because we would have to generate %d, for every possible integer
-     *
-     * So, the next thing I wonder if we can modify tailcopy, so that we directly
-     * copy into mbuf based on a function, rather than copying into a temporary
-     * mbuf and then doing the copy
-     *
-     */
-
-    n = nc_snprintf(buf, 1024, "*%d\r\n$4\r\nmget\r\n", msg->narg - 1);
-
-    str.data = (uint8_t *)&buf;
-    str.len = (uint32_t)n;
-
-    return &str;
-}
-
-static struct string *
-msg_del_string(struct msg *msg)
-{
-    static char buf[1024];
-    int n;
-    static struct string str;
-
-    ASSERT(msg->narg > 1);
-
-    n = nc_snprintf(buf, 1024, "*%d\r\n$3\r\ndel\r\n", msg->narg - 1);
-
-    str.data = (uint8_t *)&buf;
-    str.len = (uint32_t)n;
-
-    return &str;
-}
-
 static rstatus_t
 msg_fragment(struct context *ctx, struct conn *conn, struct msg *msg)
 {
-    rstatus_t status;
-    struct msg *nmsg;
-    struct mbuf *nbuf;
-    struct string *headcopy, *tailcopy;
+    rstatus_t status;  /* return status */
+    struct msg *nmsg;  /* new message */
+    struct mbuf *nbuf; /* new mbuf */
 
     ASSERT(conn->client && !conn->proxy);
     ASSERT(msg->request);
 
-    switch (msg->type) {
-    case MSG_REQ_REDIS_MGET:
-        headcopy = msg_mget_string(msg);
-        tailcopy = &MCOPY_NIL;
-        break;
-
-    case MSG_REQ_REDIS_DEL:
-        headcopy = msg_del_string(msg);
-        tailcopy = &MCOPY_NIL;
-        break;
-
-    default:
-        NOT_REACHED();
-        break;
-    }
-
     /*
-     * typedef void (*mbuf_precopy_t)(void *arg);
      *
-     * mbuf_split(struct mhdr *h, uint8_t *pos, mbuf_copy_t *cb, void *cbarg)
-     *
-     * memcache_precopy_fixup()
-     * redis_precopy_fixup()
-     *
-     * memcache_postcopy_fixup()
-     * redis_postcopy_fixup()
+     * memcache_precopy_fixup(); redis_precopy_fixup()
+     * memcache_postcopy_fixup(); redis_postcopy_fixup()
      *
      * msg->precopy_fixup(); msg->precopy()
      * msg->postcopy_fixup(); msg->postcopy()
      *
      */
-    nbuf = mbuf_split(&msg->mhdr, msg->pos, headcopy, tailcopy);
+    nbuf = mbuf_split(&msg->mhdr, msg->pos, redis_precopy_fixup, msg);
     if (nbuf == NULL) {
         return NC_ENOMEM;
     }
@@ -570,7 +497,7 @@ msg_repair(struct context *ctx, struct conn *conn, struct msg *msg)
 {
     struct mbuf *nbuf;
 
-    nbuf = mbuf_split(&msg->mhdr, msg->pos, &MCOPY_NIL, &MCOPY_NIL);
+    nbuf = mbuf_split(&msg->mhdr, msg->pos, NULL, NULL);
     if (nbuf == NULL) {
         return NC_ENOMEM;
     }

@@ -54,7 +54,7 @@ printf '\nttl\n'
 printf '*2\r\n$4\r\npttl\r\n$3\r\nfoo\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
 printf '*2\r\n$3\r\nttl\r\n$3\r\nfoo\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
 printf '*3\r\n$3\r\nset\r\n$3\r\nfoo\r\n$3\r\noof\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
-printf '*3\r\n$7\r\nexpire\r\n$3\r\nfoo\r\n$2\r\n10\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
+printf '*3\r\n$6\r\nexpire\r\n$3\r\nfoo\r\n$2\r\n10\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
 printf '*2\r\n$3\r\nttl\r\n$3\r\nfoo\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
 
 printf '\ntype\n'

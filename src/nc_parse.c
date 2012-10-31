@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+#include <stdio.h>
 #include <ctype.h>
 
 #include <nc_core.h>
@@ -1798,6 +1799,35 @@ redis_fixup(struct msg *msg)
     }
 }
 
+void
+redis_precopy_fixup(struct mbuf *mbuf, void *arg)
+{
+    struct msg *msg = arg;
+    int n;
+
+    ASSERT(msg->request);
+    ASSERT(msg->narg > 1);
+    ASSERT(mbuf_empty(mbuf));
+
+    switch (msg->type) {
+    case MSG_REQ_REDIS_MGET:
+        n = nc_snprintf(mbuf->last, mbuf_size(mbuf), "*%d\r\n$4\r\nmget\r\n",
+                        msg->narg - 1);
+        break;
+
+    case MSG_REQ_REDIS_DEL:
+        n = nc_snprintf(mbuf->last, mbuf_size(mbuf), "*%d\r\n$3\r\ndel\r\n",
+                        msg->narg - 1);
+        break;
+
+    default:
+        NOT_REACHED();
+        n = 0;
+    }
+
+    mbuf->last += n;
+}
+
 rstatus_t
 redis_postcopy_fixup(struct msg *msg)
 {
@@ -1834,9 +1864,6 @@ redis_postcopy_fixup(struct msg *msg)
     /* fix up the narg_start and narg_end */
     msg->narg_start = nhbuf->pos;
     msg->narg_end = nhbuf->last;
-
-    log_hexdump(LOG_INFO, nhbuf->pos, mbuf_length(nhbuf), "nhbuf: ");
-    log_hexdump(LOG_INFO, hbuf->pos, mbuf_length(hbuf), "hbuf: ");
 
     return NC_OK;
 }

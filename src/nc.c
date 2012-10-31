@@ -477,38 +477,6 @@ nc_post_run(struct instance *nci)
 }
 
 static void
-nc_check_parsing(void)
-{
-    struct msg *msg;
-    struct mbuf *mbuf;
-    struct string reqs[] = {
-        //string("*2\r\n$4\r\nmget\r\n$4\r\nkey1\r\n"),
-        string("*3\r\n$4\r\nmget\r\n$4\r\nkey1\r\n$4\r\nkey2\r\n"),
-        //string("*3\r\n$6\r\nappend\r\n$4\r\nkey1\r\n$6\r\nvalue1"),
-    };
-    uint32_t i;
-
-    for (i = 0; i < NELEMS(reqs); i++) {
-        msg = msg_get(NULL, true);
-        ASSERT(msg != NULL);
-
-        mbuf = mbuf_get();
-        ASSERT(mbuf != NULL);
-
-        mbuf_insert(&msg->mhdr, mbuf);
-        msg->pos = mbuf->pos;
-
-        mbuf_copy(mbuf, reqs[i].data, reqs[i].len);
-
-        parse_request(msg);
-
-        msg_put(msg);
-    }
-
-    exit(0);
-}
-
-static void
 nc_run(struct instance *nci)
 {
     rstatus_t status;
@@ -518,8 +486,6 @@ nc_run(struct instance *nci)
     if (ctx == NULL) {
         return;
     }
-
-    //nc_check_parsing();
 
     /* run rabbit run */
     for (;;) {
