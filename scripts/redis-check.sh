@@ -10,9 +10,12 @@ timeout="-t 1"
 timeout=""
 
 # keys
+
 printf '\ndel\n'
 printf '*2\r\n$3\r\ndel\r\n$3\r\nfoo\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
 printf '*3\r\n$3\r\ndel\r\n$3\r\nfoo\r\n$3\r\nbar\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
+printf '*3\r\n$3\r\nset\r\n$3\r\nfoo\r\n$3\r\noof\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
+printf '*3\r\n$3\r\nset\r\n$3\r\nbar\r\n$3\r\nrab\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
 printf '*4\r\n$3\r\ndel\r\n$3\r\nfoo\r\n$3\r\nbar\r\n$6\r\nfoobar\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
 
 printf '\nexists\n'
@@ -153,6 +156,8 @@ printf '*2\r\n$3\r\nget\r\n$3\r\nfoo\r\n' | socat ${debug} ${timeout} - TCP:loca
 printf '*4\r\n$8\r\nsetrange\r\n$3\r\nfoo\r\n$1\r\n4\r\n$3\r\noof\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
 printf '*2\r\n$3\r\nget\r\n$3\r\nfoo\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
 
+# hashes
+
 printf '\nhdel\n'
 printf '*2\r\n$3\r\ndel\r\n$4\r\nhfoo\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
 printf '*4\r\n$4\r\nhdel\r\n$4\r\nhfoo\r\n$6\r\nfield1\r\n$3\r\nbar\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
@@ -235,6 +240,8 @@ printf '*2\r\n$3\r\ndel\r\n$4\r\nhfoo\r\n' | socat ${debug} ${timeout} - TCP:loc
 printf '*2\r\n$5\r\nhvals\r\n$4\r\nhfoo\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
 printf '*6\r\n$5\r\nhmset\r\n$4\r\nhfoo\r\n$6\r\nfield1\r\n$3\r\nbar\r\n$6\r\nfield2\r\n$3\r\nbas\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
 printf '*2\r\n$5\r\nhvals\r\n$4\r\nhfoo\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
+
+# lists
 
 printf '\nlindex\n'
 printf '*2\r\n$3\r\ndel\r\n$4\r\nlfoo\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
@@ -328,6 +335,8 @@ printf '*3\r\n$6\r\nrpushx\r\n$4\r\nlfoo\r\n$3\r\nbar\r\n' | socat ${debug} ${ti
 printf '*3\r\n$6\r\nrpushx\r\n$4\r\nlfoo\r\n$3\r\nbas\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
 printf '*4\r\n$6\r\nlrange\r\n$4\r\nlfoo\r\n$1\r\n0\r\n$1\r\n3\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
 
+# sets
+
 printf '\nsadd\n'
 printf '*2\r\n$3\r\ndel\r\n$4\r\nsfoo\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
 printf '*4\r\n$4\r\nsadd\r\n$4\r\nsfoo\r\n$3\r\nbar\r\n$3\r\nbas\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
@@ -372,6 +381,8 @@ printf '*3\r\n$4\r\nsrem\r\n$4\r\nsfoo\r\n$3\r\nbar\r\n' | socat ${debug} ${time
 printf '*5\r\n$4\r\nsadd\r\n$4\r\nsfoo\r\n$3\r\nbar\r\n$3\r\nbas\r\n$3\r\nbat\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
 printf '*3\r\n$4\r\nsrem\r\n$4\r\nsfoo\r\n$3\r\nbar\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
 printf '*5\r\n$4\r\nsrem\r\n$4\r\nsfoo\r\n$3\r\nbas\r\n$3\r\nbat\r\n$3\r\nrab\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close
+
+# sorted sets
 
 printf '\nzadd\n'
 printf '*2\r\n$3\r\ndel\r\n$4\r\nzfoo\r\n' | socat ${debug} ${timeout} - TCP:localhost:${port},shut-close

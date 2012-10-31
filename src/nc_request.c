@@ -67,8 +67,6 @@ req_done(struct conn *conn, struct msg *msg)
     struct msg *cmsg, *pmsg; /* current and previous message */
     uint64_t id;
     uint32_t nfragment;
-    struct mbuf *mbuf;
-    int n;
 
     ASSERT(conn->client && !conn->proxy);
     ASSERT(msg->request);
@@ -114,8 +112,8 @@ req_done(struct conn *conn, struct msg *msg)
     }
 
     /*
-     * At this point, all the fragments have been received, including the
-     * last fragment.
+     * At this point, all the fragments including the last fragment have
+     * been received.
      *
      * Mark all fragments of the given request to be done to speed up future
      * req_done calls for any of fragments of this request
@@ -124,22 +122,11 @@ req_done(struct conn *conn, struct msg *msg)
     msg->fdone = 1;
     nfragment = 1;
 
-    uint32_t integer = msg->peer != NULL ? msg->peer->integer : 0;
-    struct msg *first_msg = NULL;
-
-    if (msg->first_fragment) {
-        first_msg = msg;
-    }
-
     for (pmsg = msg, cmsg = TAILQ_PREV(msg, msg_tqh, c_tqe);
          cmsg != NULL && cmsg->frag_id == id;
          pmsg = cmsg, cmsg = TAILQ_PREV(cmsg, msg_tqh, c_tqe)) {
         cmsg->fdone = 1;
         nfragment++;
-        integer += cmsg->peer != NULL ? cmsg->peer->integer : 0;
-        if (cmsg->first_fragment) {
-            first_msg = msg;
-        }
     }
 
     for (pmsg = msg, cmsg = TAILQ_NEXT(msg, c_tqe);
@@ -147,40 +134,10 @@ req_done(struct conn *conn, struct msg *msg)
          pmsg = cmsg, cmsg = TAILQ_NEXT(cmsg, c_tqe)) {
         cmsg->fdone = 1;
         nfragment++;
-        integer += cmsg->peer != NULL ? cmsg->peer->integer : 0;
-        if (cmsg->first_fragment) {
-            first_msg = msg;
-        }
     }
+    ASSERT(msg->frag_owner->nfrag == nfragment);
 
-    if (first_msg->peer != NULL) {
-        switch (first_msg->peer->type) {
-        case MSG_RSP_REDIS_INTEGER:
-            mbuf = STAILQ_FIRST(&first_msg->peer->mhdr);
-
-            ASSERT(first_msg->type == MSG_REQ_REDIS_DEL);
-            ASSERT(first_msg->peer->mlen == 0);
-            ASSERT(mbuf_length(mbuf) == 0);
-
-            n = nc_scnprintf(mbuf->pos, mbuf_size(mbuf), ":%d\r\n", integer);
-            mbuf->last += n;
-            first_msg->peer->mlen += (uint32_t)n;
-            break;
-
-        case MSG_RSP_REDIS_MULTIBULK:
-            mbuf = mbuf_get();
-            ASSERT(mbuf != NULL);
-
-            STAILQ_INSERT_HEAD(&msg->mhdr, mbuf, next);
-            n = nc_scnprintf(mbuf->pos, mbuf_size(mbuf), "*%d\r\n", pmsg->nfrag);
-            mbuf->last += n;
-            first_msg->peer->mlen += (uint32_t)n;
-            break;
-
-        default:
-            NOT_REACHED();
-        }
-    }
+    redis_rsp_postfixup(msg->frag_owner);
 
     log_debug(LOG_DEBUG, "req from c %d with fid %"PRIu64" and %"PRIu32" "
               "fragments is done", conn->sd, id, nfragment);
@@ -192,7 +149,7 @@ req_done(struct conn *conn, struct msg *msg)
  * Return true if request is in error, false otherwise
  *
  * A request is in error, if there was an error in receiving response for the
- * given request. A multiget request is in error if there was an error in
+ * given request. A request vector is in error if there was an error in
  * receiving response for any its fragments.
  */
 bool
@@ -246,7 +203,6 @@ ferror:
      * Mark all fragments of the given request to be in error to speed up
      * future req_error calls for any of fragments of this request
      */
-
     msg->ferror = 1;
     nfragment = 1;
 

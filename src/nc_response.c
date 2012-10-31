@@ -215,7 +215,7 @@ rsp_forward(struct context *ctx, struct conn *s_conn, struct msg *msg)
     pmsg->peer = msg;
     msg->peer = pmsg;
 
-    redis_fixup(msg);
+    redis_rsp_prefixup(msg);
 
     c_conn = pmsg->owner;
     ASSERT(c_conn->client && !c_conn->proxy);

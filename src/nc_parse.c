@@ -1730,7 +1730,7 @@ error:
 }
 
 void
-redis_fixup(struct msg *msg)
+redis_rsp_prefixup(struct msg *msg)
 {
     struct msg *pmsg = msg->peer; /* peer request */
     struct mbuf *mbuf;
@@ -1739,63 +1739,120 @@ redis_fixup(struct msg *msg)
     ASSERT(pmsg->request);
 
     if (pmsg->frag_id == 0) {
+        /* do nothing, if not a response for a fragmented request */
         return;
     }
 
-    /*
-     * Valid responses for a fragmented requests are MSG_RSP_REDIS_INTEGER or,
-     * MSG_RSP_REDIS_MULTIBULK. For an invalid response, we send out -ERR
-     * with EINVAL errno
-     */
-    if (msg->type != MSG_RSP_REDIS_INTEGER && msg->type != MSG_RSP_REDIS_MULTIBULK) {
-        mbuf = STAILQ_FIRST(&msg->mhdr);
-        log_hexdump(LOG_ERR, mbuf->pos, mbuf_length(mbuf), "rsp fragment "
-                    "with unknown type %d", msg->type);
-        pmsg->error = 1;
-        pmsg->err = EINVAL;
-        return;
-    }
-
-    if (msg->type == MSG_RSP_REDIS_INTEGER) {
+    switch (msg->type) {
+    case MSG_RSP_REDIS_INTEGER:
+        /* only redis 'del' fragmented request sends back integer reply */
         ASSERT(pmsg->type == MSG_REQ_REDIS_DEL);
-        /*
-         * Only redis 'del' command is a candidate for fragmentation
-         * and sends back a integer reply.
-         *
-         * Because of how we parse replies, the integer reply will be
-         * completely encpsuated in a single mbuf and we should skip
-         * over all the mbuf contents as the parser has already parsed
-         * and stored reply in msg->integer
-         */
-        mbuf = STAILQ_FIRST(&msg->mhdr);
 
+        mbuf = STAILQ_FIRST(&msg->mhdr);
+        /*
+         * Our response parser guarantees that the integer reply will be
+         * completely encapsulated in a single mbuf and we should skip over
+         * all the mbuf contents and discard it as the parser has already
+         * parsed the integer reply and stored it in msg->integer
+         */
         ASSERT(mbuf == STAILQ_LAST(&msg->mhdr, mbuf, next));
         ASSERT(msg->mlen == mbuf_length(mbuf));
 
         msg->mlen -= mbuf_length(mbuf);
         mbuf_rewind(mbuf);
 
-        mbuf->pos = mbuf->start;
-        mbuf->last = mbuf->pos;
-    }
+        /* accumulate the integer value in frag_owner of peer request */
+        pmsg->frag_owner->integer += msg->integer;
+        break;
 
-    if (msg->type == MSG_RSP_REDIS_MULTIBULK) {
+    case MSG_RSP_REDIS_MULTIBULK:
+        /* only redis 'mget' fragmented request sends back multi-bulk reply */
         ASSERT(pmsg->type == MSG_REQ_REDIS_MGET);
+
+        mbuf = STAILQ_FIRST(&msg->mhdr);
         /*
-         * Only redis 'mget' command is a candidate for fragmentation
-         * and sends back a multi-bulk reply
-         *
-         * The muti-bulk reply can span over multiple mbufs and in each
-         * reply we would like to skip over the narg token.
-         *
-         * Furthermore, because of the way I parse and tokenize replies,
-         * the '\r\n' might not exists in a contiguous region.
+         * Muti-bulk reply can span over multiple mbufs and in each reply
+         * we should skip over the narg token. Our response parser
+         * guarantees thaat the narg token and the immediately following
+         * '\r\n' will exist in a contiguous region in the first mbuf
+         */
+        ASSERT(msg->narg_start == mbuf->pos);
+        ASSERT(msg->narg_start < msg->narg_end);
+
+        msg->narg_end += CRLF_LEN;
+        msg->mlen -= (uint32_t)(msg->narg_end - msg->narg_start);
+        mbuf->pos = msg->narg_end;
+
+        if (pmsg->first_fragment) {
+            mbuf = mbuf_get();
+            if (mbuf == NULL) {
+                pmsg->error = 1;
+                pmsg->err = EINVAL;
+                return;
+            }
+            STAILQ_INSERT_HEAD(&msg->mhdr, mbuf, next);
+        }
+        break;
+
+    default:
+        /*
+         * Valid responses for a fragmented request are MSG_RSP_REDIS_INTEGER or,
+         * MSG_RSP_REDIS_MULTIBULK. For an invalid response, we send out -ERR
+         * with EINVAL errno
          */
         mbuf = STAILQ_FIRST(&msg->mhdr);
-        ASSERT(msg->narg_start == mbuf->pos);
-        msg->narg_end += CRLF_LEN;
-        msg->mlen -= (uint32_t) (msg->narg_end - msg->narg_start);
-        mbuf->pos = msg->narg_end;
+        log_hexdump(LOG_ERR, mbuf->pos, mbuf_length(mbuf), "rsp fragment "
+                    "with unknown type %d", msg->type);
+        pmsg->error = 1;
+        pmsg->err = EINVAL;
+        break;
+    }
+}
+
+void
+redis_rsp_postfixup(struct msg *msg)
+{
+    struct msg *pmsg = msg->peer; /* peer response */
+    struct mbuf *mbuf;
+    int n;
+
+    ASSERT(msg->request && msg->first_fragment);
+    if (msg->error || msg->ferror) {
+        /* do nothing, if msg is in error */
+        return;
+    }
+
+    ASSERT(!pmsg->request);
+
+    switch (pmsg->type) {
+    case MSG_RSP_REDIS_INTEGER:
+        /* only redis 'del' fragmented request sends back integer reply */
+        ASSERT(msg->type == MSG_REQ_REDIS_DEL);
+
+        mbuf = STAILQ_FIRST(&pmsg->mhdr);
+
+        ASSERT(pmsg->mlen == 0);
+        ASSERT(mbuf_empty(mbuf));
+
+        n = nc_scnprintf(mbuf->last, mbuf_size(mbuf), ":%d\r\n", msg->integer);
+        mbuf->last += n;
+        pmsg->mlen += (uint32_t)n;
+        break;
+
+    case MSG_RSP_REDIS_MULTIBULK:
+        /* only redis 'mget' fragmented request sends back multi-bulk reply */
+        ASSERT(msg->type == MSG_REQ_REDIS_MGET);
+
+        mbuf = STAILQ_FIRST(&pmsg->mhdr);
+        ASSERT(mbuf_empty(mbuf));
+
+        n = nc_scnprintf(mbuf->last, mbuf_size(mbuf), "*%d\r\n", msg->nfrag);
+        mbuf->last += n;
+        pmsg->mlen += (uint32_t)n;
+        break;
+
+    default:
+        NOT_REACHED();
     }
 }
 

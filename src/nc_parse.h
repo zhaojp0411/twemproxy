@@ -161,7 +161,8 @@ typedef enum parse_result {
 void parse_request(struct msg *r);
 void parse_response(struct msg *r);
 
-void redis_fixup(struct msg *msg);
+void redis_rsp_prefixup(struct msg *msg);
+void redis_rsp_postfixup(struct msg *msg);
 void redis_precopy_fixup(struct mbuf *mbuf, void *arg);
 rstatus_t redis_postcopy_fixup(struct msg *msg);
 

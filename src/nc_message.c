@@ -296,8 +296,7 @@ msg_get_error(err_t err)
     }
     mbuf_insert(&msg->mhdr, mbuf);
 
-    n = nc_scnprintf(mbuf->last, mbuf->end - mbuf->last, "-ERR %s"CRLF,
-                     errstr);
+    n = nc_scnprintf(mbuf->last, mbuf_size(mbuf), "-ERR %s"CRLF, errstr);
     mbuf->last += n;
     msg->mlen = (uint32_t)n;
 
@@ -471,16 +470,15 @@ msg_fragment(struct context *ctx, struct conn *conn, struct msg *msg)
         /* this is where we can create a fragmented response, the first time, or on the retrun path */
         msg->frag_id = ++frag_id;
         msg->first_fragment = 1;
-        msg->nfrag++;
+        msg->nfrag = 1;
         msg->frag_owner = msg;
     }
     nmsg->frag_id = msg->frag_id;
     msg->last_fragment = 0;
     nmsg->last_fragment = 1;
 
-    /* REDIS hack */
     nmsg->frag_owner = msg->frag_owner;
-    nmsg->frag_owner->nfrag++;
+    msg->frag_owner->nfrag++;
 
     stats_pool_incr(ctx, conn->owner, fragments);
 
