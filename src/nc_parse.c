@@ -841,11 +841,15 @@ parse_request(struct msg *r)
                 r->rlen = r->rlen * 10 + (uint32_t)(ch - '0');
             } else if (ch == CR) {
                 if (r->rlen == 0) {
-                    log_error("rejecting command with empty key");
+                    log_error("parsed bad req %"PRIu64" of type %d with empty "
+                              "key", r->id, r->type);
                     goto error;
                 }
-                if (r->rlen > 512) {
-                    log_error("reject command with long key");
+                if (r->rlen > mbuf_data_size()) {
+                    log_error("parsed bad req %"PRIu64" of type %d with key "
+                              "length %d that exceeds maximum redis key "
+                              "length of %d", r->id, r->type, r->rlen,
+                              mbuf_data_size());
                     goto error;
                 }
                 if (r->rnarg == 0) {
