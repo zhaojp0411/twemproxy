@@ -138,28 +138,8 @@
     (str15icmp(m, c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14) &&       \
      (m[15] == c15 || m[15] == (c15 ^ 0x20)))
 
-/*
- * From memcache protocol specification:
- *
- * Data stored by memcached is identified with the help of a key. A key
- * is a text string which should uniquely identify the data for clients
- * that are interested in storing and retrieving it.  Currently the
- * length limit of a key is set at 250 characters (of course, normally
- * clients wouldn't need to use such long keys); the key must not include
- * control characters or whitespace.
- */
-#define PARSE_MAX_KEY_LENGTH 250
-
-typedef enum parse_result {
-    PARSE_OK,                 /* parsing ok */
-    PARSE_ERROR,              /* parsing error */
-    PARSE_REPAIR,             /* more to parse -> repair parsed & unparsed data */
-    PARSE_FRAGMENT,           /* multi-get request -> fragment */
-    PARSE_AGAIN,              /* incomplete -> parse again */
-} parse_result_t;
-
-void parse_request(struct msg *r);
-void parse_response(struct msg *r);
+void redis_req_parser(struct msg *r);
+void redis_rsp_parser(struct msg *r);
 
 void redis_rsp_prefixup(struct msg *msg);
 void redis_rsp_postfixup(struct msg *msg);

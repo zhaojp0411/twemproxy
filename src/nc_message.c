@@ -218,7 +218,7 @@ done:
     msg->token = NULL;
 
     msg->parse = NULL;
-    msg->result = PARSE_OK;
+    msg->result = MSG_PARSE_OK;
 
     msg->type = MSG_UNKNOWN;
 
@@ -265,7 +265,7 @@ msg_get(struct conn *conn, bool request)
 
     msg->owner = conn;
     msg->request = request ? 1 : 0;
-    msg->parse = request ? parse_request : parse_response;
+    msg->parse = request ? redis_req_parser : redis_rsp_parser;
 
     log_debug(LOG_VVERB, "get msg %p id %"PRIu64" request %d owner sd %d",
               msg, msg->id, msg->request, conn->sd);
@@ -519,19 +519,19 @@ msg_parse(struct context *ctx, struct conn *conn, struct msg *msg)
     msg->parse(msg);
 
     switch (msg->result) {
-    case PARSE_OK:
+    case MSG_PARSE_OK:
         status = msg_parsed(ctx, conn, msg);
         break;
 
-    case PARSE_FRAGMENT:
+    case MSG_PARSE_FRAGMENT:
         status = msg_fragment(ctx, conn, msg);
         break;
 
-    case PARSE_REPAIR:
+    case MSG_PARSE_REPAIR:
         status = msg_repair(ctx, conn, msg);
         break;
 
-    case PARSE_AGAIN:
+    case MSG_PARSE_AGAIN:
         status = NC_OK;
         break;
 

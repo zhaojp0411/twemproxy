@@ -26,7 +26,7 @@
  * return false
  */
 static bool
-parse_arg0(struct msg *r)
+redis_arg0(struct msg *r)
 {
     switch (r->type) {
     case MSG_REQ_REDIS_EXISTS:
@@ -69,7 +69,7 @@ parse_arg0(struct msg *r)
  * return false
  */
 static bool
-parse_arg1(struct msg *r)
+redis_arg1(struct msg *r)
 {
     switch (r->type) {
     case MSG_REQ_REDIS_EXPIRE:
@@ -112,7 +112,7 @@ parse_arg1(struct msg *r)
  * return false
  */
 static bool
-parse_arg2(struct msg *r)
+redis_arg2(struct msg *r)
 {
     switch (r->type) {
     case MSG_REQ_REDIS_GETRANGE:
@@ -149,7 +149,7 @@ parse_arg2(struct msg *r)
  * return false
  */
 static bool
-parse_arg3(struct msg *r)
+redis_arg3(struct msg *r)
 {
     switch (r->type) {
     case MSG_REQ_REDIS_LINSERT:
@@ -158,6 +158,7 @@ parse_arg3(struct msg *r)
     default:
         break;
     }
+
     return false;
 }
 
@@ -166,7 +167,7 @@ parse_arg3(struct msg *r)
  * return false
  */
 static bool
-parse_argn(struct msg *r)
+redis_argn(struct msg *r)
 {
     switch (r->type) {
     case MSG_REQ_REDIS_BITCOUNT:
@@ -196,8 +197,12 @@ parse_argn(struct msg *r)
     return false;
 }
 
+/*
+ * Return true, if the redis command is a vector command accepting one or
+ * more keys, otherwise return false
+ */
 static bool
-parse_argx(struct msg *r)
+redis_argx(struct msg *r)
 {
     switch (r->type) {
     case MSG_REQ_REDIS_MGET:
@@ -236,7 +241,7 @@ parse_argx(struct msg *r)
  * Nutcracker only supports the Redis unified protocol for requests.
  */
 void
-parse_request(struct msg *r)
+redis_req_parser(struct msg *r)
 {
     struct mbuf *b;
     uint8_t *p, *m;
@@ -907,32 +912,32 @@ parse_request(struct msg *r)
         case SW_KEY_LF:
             switch (ch) {
             case LF:
-                if (parse_arg0(r)) {
+                if (redis_arg0(r)) {
                     if (r->rnarg != 0) {
                         goto error;
                     }
                     goto done;
-                } else if (parse_arg1(r)) {
+                } else if (redis_arg1(r)) {
                     if (r->rnarg != 1) {
                         goto error;
                     }
                     state = SW_ARG1_LEN;
-                } else if (parse_arg2(r)) {
+                } else if (redis_arg2(r)) {
                     if (r->rnarg != 2) {
                         goto error;
                     }
                     state = SW_ARG1_LEN;
-                } else if (parse_arg3(r)) {
+                } else if (redis_arg3(r)) {
                     if (r->rnarg != 3) {
                         goto error;
                     }
                     state = SW_ARG1_LEN;
-                } else if (parse_argn(r)) {
+                } else if (redis_argn(r)) {
                     if (r->rnarg == 0) {
                         goto done;
                     }
                     state = SW_ARG1_LEN;
-                } else if (parse_argx(r)) {
+                } else if (redis_argx(r)) {
                     if (r->rnarg == 0) {
                         goto done;
                     }
@@ -1010,22 +1015,22 @@ parse_request(struct msg *r)
         case SW_ARG1_LF:
             switch (ch) {
             case LF:
-                if (parse_arg1(r)) {
+                if (redis_arg1(r)) {
                     if (r->rnarg != 0) {
                         goto error;
                     }
                     goto done;
-                } else if (parse_arg2(r)) {
+                } else if (redis_arg2(r)) {
                     if (r->rnarg != 1) {
                         goto error;
                     }
                     state = SW_ARG2_LEN;
-                } else if (parse_arg3(r)) {
+                } else if (redis_arg3(r)) {
                     if (r->rnarg != 2) {
                         goto error;
                     }
                     state = SW_ARG2_LEN;
-                } else if (parse_argn(r)) {
+                } else if (redis_argn(r)) {
                     if (r->rnarg == 0) {
                         goto done;
                     }
@@ -1098,17 +1103,17 @@ parse_request(struct msg *r)
         case SW_ARG2_LF:
             switch (ch) {
             case LF:
-                if (parse_arg2(r)) {
+                if (redis_arg2(r)) {
                     if (r->rnarg != 0) {
                         goto error;
                     }
                     goto done;
-                } else if (parse_arg3(r)) {
+                } else if (redis_arg3(r)) {
                     if (r->rnarg != 1) {
                         goto error;
                     }
                     state = SW_ARG3_LEN;
-                } else if (parse_argn(r)) {
+                } else if (redis_argn(r)) {
                     if (r->rnarg == 0) {
                         goto done;
                     }
@@ -1181,12 +1186,12 @@ parse_request(struct msg *r)
         case SW_ARG3_LF:
             switch (ch) {
             case LF:
-                if (parse_arg3(r)) {
+                if (redis_arg3(r)) {
                     if (r->rnarg != 0) {
                         goto error;
                     }
                     goto done;
-                } else if (parse_argn(r)) {
+                } else if (redis_argn(r)) {
                     if (r->rnarg == 0) {
                         goto done;
                     }
@@ -1259,7 +1264,7 @@ parse_request(struct msg *r)
         case SW_ARGN_LF:
             switch (ch) {
             case LF:
-                if (parse_argn(r)) {
+                if (redis_argn(r)) {
                     if (r->rnarg == 0) {
                         goto done;
                     }
@@ -1290,9 +1295,9 @@ parse_request(struct msg *r)
     if (b->last == b->end && r->token != NULL) {
         r->pos = r->token;
         r->token = NULL;
-        r->result = PARSE_REPAIR;
+        r->result = MSG_PARSE_REPAIR;
     } else {
-        r->result = PARSE_AGAIN;
+        r->result = MSG_PARSE_AGAIN;
     }
 
     log_hexdump(LOG_VERB, b->pos, mbuf_length(b), "parsed req %"PRIu64" res %d "
@@ -1306,7 +1311,7 @@ fragment:
     r->pos = r->token;
     r->token = NULL;
     r->state = state;
-    r->result = PARSE_FRAGMENT;
+    r->result = MSG_PARSE_FRAGMENT;
 
     log_hexdump(LOG_VERB, b->pos, mbuf_length(b), "parsed req %"PRIu64" res %d "
                "type %d state %d rpos %d of %d", r->id, r->result, r->type,
@@ -1319,7 +1324,7 @@ done:
     ASSERT(r->pos <= b->last);
     r->state = SW_START;
     r->token = NULL;
-    r->result = PARSE_OK;
+    r->result = MSG_PARSE_OK;
 
     log_hexdump(LOG_VERB, b->pos, mbuf_length(b), "parsed req %"PRIu64" res %d "
                 "type %d state %d rpos %d of %d", r->id, r->result, r->type,
@@ -1327,7 +1332,7 @@ done:
     return;
 
 error:
-    r->result = PARSE_ERROR;
+    r->result = MSG_PARSE_ERROR;
     r->state = state;
     errno = EINVAL;
 
@@ -1365,7 +1370,7 @@ error:
  *     will follow. The first byte of a multi bulk reply is always *.
  */
 void
-parse_response(struct msg *r)
+redis_rsp_parser(struct msg *r)
 {
     struct mbuf *b;
     uint8_t *p, *m;
@@ -1700,9 +1705,9 @@ parse_response(struct msg *r)
     if (b->last == b->end && r->token != NULL) {
         r->pos = r->token;
         r->token = NULL;
-        r->result = PARSE_REPAIR;
+        r->result = MSG_PARSE_REPAIR;
     } else {
-        r->result = PARSE_AGAIN;
+        r->result = MSG_PARSE_AGAIN;
     }
 
     log_hexdump(LOG_VERB, b->pos, mbuf_length(b), "parsed rsp %"PRIu64" res %d "
@@ -1716,7 +1721,7 @@ done:
     ASSERT(r->pos <= b->last);
     r->state = SW_START;
     r->token = NULL;
-    r->result = PARSE_OK;
+    r->result = MSG_PARSE_OK;
 
     log_hexdump(LOG_VERB, b->pos, mbuf_length(b), "parsed rsp %"PRIu64" res %d "
                 "type %d state %d rpos %d of %d", r->id, r->result, r->type,
@@ -1724,7 +1729,7 @@ done:
     return;
 
 error:
-    r->result = PARSE_ERROR;
+    r->result = MSG_PARSE_ERROR;
     r->state = state;
     errno = EINVAL;
 

@@ -22,6 +22,14 @@
 
 typedef void (*msg_parse_t)(struct msg *);
 
+typedef enum msg_parse_result {
+    MSG_PARSE_OK,           /* parsing ok */
+    MSG_PARSE_ERROR,        /* parsing error */
+    MSG_PARSE_REPAIR,       /* more to parse -> repair parsed & unparsed data */
+    MSG_PARSE_FRAGMENT,     /* multi-get request -> fragment */
+    MSG_PARSE_AGAIN,        /* incomplete -> parse again */
+} msg_parse_result_t;
+
 typedef enum msg_type {
     MSG_UNKNOWN,
     MSG_REQ_REDIS_DEL,           /* redis commands - keys */
@@ -109,55 +117,55 @@ typedef enum msg_type {
 } msg_type_t;
 
 struct msg {
-    TAILQ_ENTRY(msg) c_tqe;           /* link in client q */
-    TAILQ_ENTRY(msg) s_tqe;           /* link in server q */
-    TAILQ_ENTRY(msg) m_tqe;           /* link in send q / free q */
+    TAILQ_ENTRY(msg)   c_tqe;           /* link in client q */
+    TAILQ_ENTRY(msg)   s_tqe;           /* link in server q */
+    TAILQ_ENTRY(msg)   m_tqe;           /* link in send q / free q */
 
-    uint64_t         id;              /* message id */
-    struct msg       *peer;           /* message peer */
-    struct conn      *owner;          /* message owner - client | server */
+    uint64_t           id;              /* message id */
+    struct msg         *peer;           /* message peer */
+    struct conn        *owner;          /* message owner - client | server */
 
-    struct rbnode    tmo_rbe;         /* entry in rbtree */
+    struct rbnode      tmo_rbe;         /* entry in rbtree */
 
-    struct mhdr      mhdr;            /* message mbuf header */
-    uint32_t         mlen;            /* message length */
+    struct mhdr        mhdr;            /* message mbuf header */
+    uint32_t           mlen;            /* message length */
 
-    int              state;           /* current parser state */
-    uint8_t          *pos;            /* parser position marker */
-    uint8_t          *token;          /* contiguous token marker used by parser fsa */
+    int                state;           /* current parser state */
+    uint8_t            *pos;            /* parser position marker */
+    uint8_t            *token;          /* contiguous token marker used by parser fsa */
 
-    msg_parse_t      parse;           /* message parsing handler */
-    int              result;          /* message parsing result */
+    msg_parse_t        parse;           /* message parsing handler */
+    msg_parse_result_t result;          /* message parsing result */
 
-    msg_type_t       type;            /* message type */
+    msg_type_t         type;            /* message type */
 
-    uint8_t          *key_start;      /* key start */
-    uint8_t          *key_end;        /* key end */
+    uint8_t            *key_start;      /* key start */
+    uint8_t            *key_end;        /* key end */
 
-    uint8_t          *narg_start;     /* narg start */
-    uint8_t          *narg_end;       /* narg end */
-    uint32_t         narg;            /* # arguments */
+    uint8_t            *narg_start;     /* narg start */
+    uint8_t            *narg_end;       /* narg end */
+    uint32_t           narg;            /* # arguments */
 
-    uint32_t         rnarg;           /* running # arg used by parsing fsa */
-    uint32_t         rlen;            /* running length in parsing fsa */
+    uint32_t           rnarg;           /* running # arg used by parsing fsa */
+    uint32_t           rlen;            /* running length in parsing fsa */
 
-    struct msg       *frag_owner;     /* owner of fragment message */
-    uint32_t         nfrag;           /* # fragment */
-    uint64_t         frag_id;         /* id of fragmented message */
+    struct msg         *frag_owner;     /* owner of fragment message */
+    uint32_t           nfrag;           /* # fragment */
+    uint64_t           frag_id;         /* id of fragmented message */
 
-    uint32_t integer;
+    uint32_t           integer;
 
-    err_t            err;             /* errno on error? */
-    unsigned         error:1;         /* error? */
-    unsigned         ferror:1;        /* one or more fragments are in error? */
-    unsigned         request:1;       /* request? or response? */
-    unsigned         quit:1;          /* quit request? */
-    unsigned         noreply:1;       /* noreply? */
-    unsigned         done:1;          /* done? */
-    unsigned         fdone:1;         /* all fragments are done? */
-    unsigned         first_fragment:1;/* first fragment of retrieval request? */
-    unsigned         last_fragment:1; /* last fragment of fragmented request? */
-    unsigned         swallow:1;       /* swallow response? */
+    err_t              err;             /* errno on error? */
+    unsigned           error:1;         /* error? */
+    unsigned           ferror:1;        /* one or more fragments are in error? */
+    unsigned           request:1;       /* request? or response? */
+    unsigned           quit:1;          /* quit request? */
+    unsigned           noreply:1;       /* noreply? */
+    unsigned           done:1;          /* done? */
+    unsigned           fdone:1;         /* all fragments are done? */
+    unsigned           first_fragment:1;/* first fragment of retrieval request? */
+    unsigned           last_fragment:1; /* last fragment of fragmented request? */
+    unsigned           swallow:1;       /* swallow response? */
 };
 
 TAILQ_HEAD(msg_tqh, msg);
