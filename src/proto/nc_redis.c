@@ -1739,7 +1739,76 @@ error:
 }
 
 void
-redis_rsp_prefixup(struct msg *msg)
+redis_pre_splitcopy(struct mbuf *mbuf, void *arg)
+{
+    struct msg *msg = arg;
+    int n;
+
+    ASSERT(msg->request);
+    ASSERT(msg->narg > 1);
+    ASSERT(mbuf_empty(mbuf));
+
+    switch (msg->type) {
+    case MSG_REQ_REDIS_MGET:
+        n = nc_snprintf(mbuf->last, mbuf_size(mbuf), "*%d\r\n$4\r\nmget\r\n",
+                        msg->narg - 1);
+        break;
+
+    case MSG_REQ_REDIS_DEL:
+        n = nc_snprintf(mbuf->last, mbuf_size(mbuf), "*%d\r\n$3\r\ndel\r\n",
+                        msg->narg - 1);
+        break;
+
+    default:
+        NOT_REACHED();
+        n = 0;
+    }
+
+    mbuf->last += n;
+}
+
+rstatus_t
+redis_post_splitcopy(struct msg *msg)
+{
+    struct mbuf *hbuf, *nhbuf;         /* head mbuf and new head mbuf */
+    struct string hstr = string("*2"); /* header string */
+
+    ASSERT(msg->request);
+    ASSERT(msg->type == MSG_REQ_REDIS_MGET || msg->type == MSG_REQ_REDIS_DEL);
+    ASSERT(!STAILQ_EMPTY(&msg->mhdr));
+
+    nhbuf = mbuf_get();
+    if (nhbuf == NULL) {
+        return NC_ENOMEM;
+    }
+
+    /*
+     * Fix the head mbuf in the head (A) msg. The fix is straightforward
+     * as we just need to skip over the narg token
+     */
+    hbuf = STAILQ_FIRST(&msg->mhdr);
+    ASSERT(hbuf != NULL);
+    ASSERT(hbuf->pos ==  msg->narg_start);
+    ASSERT(hbuf->pos < msg->narg_end && msg->narg_end <= hbuf->last);
+    hbuf->pos = msg->narg_end;
+
+    /*
+     * Add a new head mbuf in the head (A) msg that just contains '*2'
+     * token
+     */
+    STAILQ_INSERT_HEAD(&msg->mhdr, nhbuf, next);
+
+    mbuf_copy(nhbuf, hstr.data, hstr.len);
+
+    /* fix up the narg_start and narg_end */
+    msg->narg_start = nhbuf->pos;
+    msg->narg_end = nhbuf->last;
+
+    return NC_OK;
+}
+
+void
+redis_pre_coalesce(struct msg *msg)
 {
     struct msg *pmsg = msg->peer; /* peer request */
     struct mbuf *mbuf;
@@ -1819,7 +1888,7 @@ redis_rsp_prefixup(struct msg *msg)
 }
 
 void
-redis_rsp_postfixup(struct msg *msg)
+redis_post_coalesce(struct msg *msg)
 {
     struct msg *pmsg = msg->peer; /* peer response */
     struct mbuf *mbuf;
@@ -1865,71 +1934,3 @@ redis_rsp_postfixup(struct msg *msg)
     }
 }
 
-void
-redis_precopy_fixup(struct mbuf *mbuf, void *arg)
-{
-    struct msg *msg = arg;
-    int n;
-
-    ASSERT(msg->request);
-    ASSERT(msg->narg > 1);
-    ASSERT(mbuf_empty(mbuf));
-
-    switch (msg->type) {
-    case MSG_REQ_REDIS_MGET:
-        n = nc_snprintf(mbuf->last, mbuf_size(mbuf), "*%d\r\n$4\r\nmget\r\n",
-                        msg->narg - 1);
-        break;
-
-    case MSG_REQ_REDIS_DEL:
-        n = nc_snprintf(mbuf->last, mbuf_size(mbuf), "*%d\r\n$3\r\ndel\r\n",
-                        msg->narg - 1);
-        break;
-
-    default:
-        NOT_REACHED();
-        n = 0;
-    }
-
-    mbuf->last += n;
-}
-
-rstatus_t
-redis_postcopy_fixup(struct msg *msg)
-{
-    struct mbuf *hbuf, *nhbuf; /* head mbuf and new head mbuf */
-    struct string hstr = string("*2");
-
-    ASSERT(msg->request);
-    ASSERT(msg->type == MSG_REQ_REDIS_MGET || msg->type == MSG_REQ_REDIS_DEL);
-    ASSERT(!STAILQ_EMPTY(&msg->mhdr));
-
-    nhbuf = mbuf_get();
-    if (nhbuf == NULL) {
-        return NC_ENOMEM;
-    }
-
-    /*
-     * Fix/Repair the head mbuf in the head (A) msg. The fix is fairly
-     * staright forward as we just need to skip over the narg token
-     */
-    hbuf = STAILQ_FIRST(&msg->mhdr);
-    ASSERT(hbuf != NULL);
-    ASSERT(hbuf->pos ==  msg->narg_start);
-    ASSERT(hbuf->pos < msg->narg_end && msg->narg_end <= hbuf->last);
-    hbuf->pos = msg->narg_end;
-
-    /*
-     * Add a new head mbuf in the head (A) msg that just contains '*2'
-     * token
-     */
-    STAILQ_INSERT_HEAD(&msg->mhdr, nhbuf, next);
-
-    mbuf_copy(nhbuf, hstr.data, hstr.len);
-
-    /* fix up the narg_start and narg_end */
-    msg->narg_start = nhbuf->pos;
-    msg->narg_end = nhbuf->last;
-
-    return NC_OK;
-}

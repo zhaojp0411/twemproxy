@@ -433,21 +433,12 @@ msg_fragment(struct context *ctx, struct conn *conn, struct msg *msg)
     ASSERT(conn->client && !conn->proxy);
     ASSERT(msg->request);
 
-    /*
-     *
-     * memcache_precopy_fixup(); redis_precopy_fixup()
-     * memcache_postcopy_fixup(); redis_postcopy_fixup()
-     *
-     * msg->precopy_fixup(); msg->precopy()
-     * msg->postcopy_fixup(); msg->postcopy()
-     *
-     */
-    nbuf = mbuf_split(&msg->mhdr, msg->pos, redis_precopy_fixup, msg);
+    nbuf = mbuf_split(&msg->mhdr, msg->pos, redis_pre_splitcopy, msg);
     if (nbuf == NULL) {
         return NC_ENOMEM;
     }
 
-    status = redis_postcopy_fixup(msg);
+    status = redis_post_splitcopy(msg);
     if (status != NC_OK) {
         mbuf_put(nbuf);
         return status;

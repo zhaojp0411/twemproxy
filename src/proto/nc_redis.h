@@ -141,9 +141,9 @@
 void redis_req_parser(struct msg *r);
 void redis_rsp_parser(struct msg *r);
 
-void redis_rsp_prefixup(struct msg *msg);
-void redis_rsp_postfixup(struct msg *msg);
-void redis_precopy_fixup(struct mbuf *mbuf, void *arg);
-rstatus_t redis_postcopy_fixup(struct msg *msg);
+void redis_pre_coalesce(struct msg *msg);
+void redis_post_coalesce(struct msg *msg);
+void redis_pre_splitcopy(struct mbuf *mbuf, void *arg);
+rstatus_t redis_post_splitcopy(struct msg *msg);
 
 #endif
