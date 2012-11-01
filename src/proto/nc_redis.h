@@ -15,8 +15,8 @@
  * limitations under the License.
  */
 
-#ifndef _NC_PARSE_H_
-#define _NC_PARSE_H_
+#ifndef _NC_REDIS_H_
+#define _NC_REDIS_H_
 
 #include <nc_core.h>
 
