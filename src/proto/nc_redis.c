@@ -19,7 +19,7 @@
 #include <ctype.h>
 
 #include <nc_core.h>
-#include <nc_parse.h>
+#include <nc_redis.h>
 
 /*
  * Return true, if the redis command accepts no arguments, otherwise
