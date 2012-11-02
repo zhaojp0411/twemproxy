@@ -21,8 +21,8 @@
 #include <sys/uio.h>
 
 #include <nc_core.h>
-#include <nc_redis.h>
 #include <nc_server.h>
+#include <proto/nc_proto.h>
 
 #if (IOV_MAX > 128)
 #define NC_IOV_MAX 128

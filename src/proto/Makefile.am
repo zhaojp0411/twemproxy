@@ -7,7 +7,7 @@ AM_CFLAGS += -Wno-unused-parameter -Wno-unused-value
 
 noinst_LIBRARIES = libproto.a
 
-noinst_HEADERS = nc_redis.h
+noinst_HEADERS = nc_proto.h
 
 libproto_a_SOURCES =	\
-	nc_redis.c nc_redis.h
+	nc_redis.c
