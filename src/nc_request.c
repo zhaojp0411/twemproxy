@@ -58,15 +58,15 @@ req_put(struct msg *msg)
  * Return true if request is done, false otherwise
  *
  * A request is done, if we received response for the given request.
- * A multiget request is done if we received responses for all its
+ * A request vector is done if we received responses for all its
  * fragments.
  */
 bool
 req_done(struct conn *conn, struct msg *msg)
 {
     struct msg *cmsg, *pmsg; /* current and previous message */
-    uint64_t id;
-    uint32_t nfragment;
+    uint64_t id;             /* fragment id */
+    uint32_t nfragment;      /* # fragment */
 
     ASSERT(conn->client && !conn->proxy);
     ASSERT(msg->request);
@@ -80,14 +80,12 @@ req_done(struct conn *conn, struct msg *msg)
         return true;
     }
 
-    /* fragment requested is done, if we recevied all responses for the request */
-
     if (msg->fdone) {
-        /* request has already been marked as done */
+        /* request vector has already been marked as done */
         return true;
     }
 
-    /* check all fragments of the given request are done */
+    /* check all fragments of the given request vector are done */
 
     for (pmsg = msg, cmsg = TAILQ_PREV(msg, msg_tqh, c_tqe);
          cmsg != NULL && cmsg->frag_id == id;
@@ -115,8 +113,8 @@ req_done(struct conn *conn, struct msg *msg)
      * At this point, all the fragments including the last fragment have
      * been received.
      *
-     * Mark all fragments of the given request to be done to speed up future
-     * req_done calls for any of fragments of this request
+     * Mark all fragments of the given request vector to be done to speed up
+     * future req_done calls for any of fragments of this request
      */
 
     msg->fdone = 1;
@@ -135,6 +133,7 @@ req_done(struct conn *conn, struct msg *msg)
         cmsg->fdone = 1;
         nfragment++;
     }
+
     ASSERT(msg->frag_owner->nfrag == nfragment);
 
     redis_post_coalesce(msg->frag_owner);

@@ -1738,6 +1738,9 @@ error:
                 r->state);
 }
 
+/*
+ * Pre-split copy handler when a request vector is fragmented.
+ */
 void
 redis_pre_splitcopy(struct mbuf *mbuf, void *arg)
 {
@@ -1760,13 +1763,16 @@ redis_pre_splitcopy(struct mbuf *mbuf, void *arg)
         break;
 
     default:
-        NOT_REACHED();
         n = 0;
+        NOT_REACHED();
     }
 
     mbuf->last += n;
 }
 
+/*
+ * Post-split copy handler that adds a new mbuf to the head message
+ */
 rstatus_t
 redis_post_splitcopy(struct msg *msg)
 {
@@ -1787,8 +1793,7 @@ redis_post_splitcopy(struct msg *msg)
      * as we just need to skip over the narg token
      */
     hbuf = STAILQ_FIRST(&msg->mhdr);
-    ASSERT(hbuf != NULL);
-    ASSERT(hbuf->pos ==  msg->narg_start);
+    ASSERT(hbuf->pos == msg->narg_start);
     ASSERT(hbuf->pos < msg->narg_end && msg->narg_end <= hbuf->last);
     hbuf->pos = msg->narg_end;
 
@@ -1797,7 +1802,6 @@ redis_post_splitcopy(struct msg *msg)
      * token
      */
     STAILQ_INSERT_HEAD(&msg->mhdr, nhbuf, next);
-
     mbuf_copy(nhbuf, hstr.data, hstr.len);
 
     /* fix up the narg_start and narg_end */

@@ -36,8 +36,8 @@
  *            +        +            .
  *            |        |            .
  *            /        \            .
- *         Request    Response      ...../ nc_mbuf.[ch]  (mesage buffers)
- *      nc_request.c  nc_response.c ...../ nc_parse.[ch] (message parser)
+ *         Request    Response      .../ nc_mbuf.[ch]  (msg buffer)
+ *      nc_request.c  nc_response.c .../ nc_memcache.c; nc_redis.c (msg parser)
  *
  * Messages in nutcracker are manipulated by a chain of processing handlers,
  * where each handler is responsible for taking the input and producing an
@@ -228,15 +228,13 @@ done:
     msg->narg_start = NULL;
     msg->narg_end = NULL;
     msg->narg = 0;
-
     msg->rnarg = 0;
     msg->rlen = 0;
+    msg->integer = 0;
 
     msg->frag_owner = NULL;
     msg->nfrag = 0;
     msg->frag_id = 0;
-
-    msg->integer = 0;
 
     msg->err = 0;
     msg->error = 0;
@@ -456,9 +454,47 @@ msg_fragment(struct context *ctx, struct conn *conn, struct msg *msg)
     nmsg->mlen = mbuf_length(nbuf);
     msg->mlen -= nmsg->mlen;
 
-    /* attach unique fragment id to all fragments of the same message */
+    /*
+     * Attach unique fragment id to all fragments of the message vector. All
+     * fragments of the message, including the first fragment point to the
+     * first fragment through the frag_owner pointer. The first_fragment and
+     * last_fragment identify first and last fragment respectively.
+     *
+     * For example, a message vector given below is split into 3 fragments:
+     *  'get key1 key2 key3\r\n'
+     *  Or,
+     *  '*4\r\n$4\r\nmget\r\n$4\r\nkey1\r\n$4\r\nkey2\r\n$4\r\nkey3\r\n'
+     *
+     *   +--------------+
+     *   |  msg vector  |
+     *   |(original msg)|
+     *   +--------------+
+     *
+     *       frag_owner         frag_owner
+     *     /-----------+      /------------+
+     *     |           |      |            |
+     *     |           v      v            |
+     *   +--------------------+     +---------------------+
+     *   |   frag_id = 10     |     |   frag_id = 10      |
+     *   | first_fragment = 1 |     |  first_fragment = 0 |
+     *   | last_fragment = 0  |     |  last_fragment = 0  |
+     *   |     nfrag = 3      |     |      nfrag = 0      |
+     *   +--------------------+     +---------------------+
+     *               ^
+     *               |  frag_owner
+     *               \-------------+
+     *                             |
+     *                             |
+     *                  +---------------------+
+     *                  |   frag_id = 10      |
+     *                  |  first_fragment = 0 |
+     *                  |  last_fragment = 1  |
+     *                  |      nfrag = 0      |
+     *                  +---------------------+
+     *
+     *
+     */
     if (msg->frag_id == 0) {
-        /* this is where we can create a fragmented response, the first time, or on the retrun path */
         msg->frag_id = ++frag_id;
         msg->first_fragment = 1;
         msg->nfrag = 1;
@@ -467,7 +503,6 @@ msg_fragment(struct context *ctx, struct conn *conn, struct msg *msg)
     nmsg->frag_id = msg->frag_id;
     msg->last_fragment = 0;
     nmsg->last_fragment = 1;
-
     nmsg->frag_owner = msg->frag_owner;
     msg->frag_owner->nfrag++;
 

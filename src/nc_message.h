@@ -142,18 +142,16 @@ struct msg {
     uint8_t            *key_start;      /* key start */
     uint8_t            *key_end;        /* key end */
 
-    uint8_t            *narg_start;     /* narg start */
-    uint8_t            *narg_end;       /* narg end */
-    uint32_t           narg;            /* # arguments */
-
-    uint32_t           rnarg;           /* running # arg used by parsing fsa */
-    uint32_t           rlen;            /* running length in parsing fsa */
+    uint8_t            *narg_start;     /* narg start (redis) */
+    uint8_t            *narg_end;       /* narg end (redis) */
+    uint32_t           narg;            /* # arguments (redis) */
+    uint32_t           rnarg;           /* running # arg used by parsing fsa (redis) */
+    uint32_t           rlen;            /* running length in parsing fsa (redis) */
+    uint32_t           integer;         /* integer reply value (redis) */
 
     struct msg         *frag_owner;     /* owner of fragment message */
     uint32_t           nfrag;           /* # fragment */
     uint64_t           frag_id;         /* id of fragmented message */
-
-    uint32_t           integer;
 
     err_t              err;             /* errno on error? */
     unsigned           error:1;         /* error? */
@@ -163,8 +161,8 @@ struct msg {
     unsigned           noreply:1;       /* noreply? */
     unsigned           done:1;          /* done? */
     unsigned           fdone:1;         /* all fragments are done? */
-    unsigned           first_fragment:1;/* first fragment of retrieval request? */
-    unsigned           last_fragment:1; /* last fragment of fragmented request? */
+    unsigned           first_fragment:1;/* first fragment? */
+    unsigned           last_fragment:1; /* last fragment? */
     unsigned           swallow:1;       /* swallow response? */
 };
 
