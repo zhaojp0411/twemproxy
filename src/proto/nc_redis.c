@@ -1937,4 +1937,3 @@ redis_post_coalesce(struct msg *msg)
         NOT_REACHED();
     }
 }
-
