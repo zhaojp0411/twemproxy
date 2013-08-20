@@ -1,12 +1,14 @@
 # twemproxy (nutcracker) [![Build Status](https://secure.travis-ci.org/twitter/twemproxy.png)](http://travis-ci.org/twitter/twemproxy)
 
 **twemproxy** (pronounced "two-em-proxy"), aka **nutcracker** is a fast and lightweight proxy for [memcached](http://www.memcached.org/) and [redis](http://redis.io/) protocol. It was primarily built to reduce the connection count on the backend caching servers.
+
 **twemproxy** (发音 "two-em-proxy"), 也称为 **nutcracker** 是基于 [memcached](http://www.memcached.org/) and [redis](http://redis.io/) 协议的快速并轻量级的代理实现。主要用与减少后端缓存服务的连接数。
 ## Build
 ## 构建
 
 To build nutcracker from [distribution tarball](http://code.google.com/p/twemproxy/downloads/list):
-下载 tar 文件  [distribution tarball](http://code.google.com/p/twemproxy/downloads/list) 进行构建:
+
+从 [distribution tarball](http://code.google.com/p/twemproxy/downloads/list) 下载 tar 文件进行构建:
 
     $ ./configure
     $ make
@@ -14,12 +16,15 @@ To build nutcracker from [distribution tarball](http://code.google.com/p/twempro
 
 To build nutcracker from [distribution tarball](http://code.google.com/p/twemproxy/downloads/list) in _debug mode_:
 
+从 [distribution tarball](http://code.google.com/p/twemproxy/downloads/list) 下载 tar 文件进行构建debug 模式:
+
     $ CFLAGS="-ggdb3 -O0" ./configure --enable-debug=full
     $ make
     $ sudo make install
 
 To build nutcracker from source with _debug logs enabled_ and _assertions disabled_:
 
+从 [distribution tarball](http://code.google.com/p/twemproxy/downloads/list) 下载 tar 文件进行构建，打开debug 日志关闭断言模式:
     $ git clone git@github.com:twitter/twemproxy.git
     $ cd twemproxy
     $ autoreconf -fvi
@@ -31,17 +36,17 @@ To build nutcracker from source with _debug logs enabled_ and _assertions disabl
 
 + Fast.
 + Lightweight.
-+ Maintains persistent server connections.
-+ Keeps connection count on the backend caching servers low.
-+ Enables pipelining of requests and responses.
-+ Supports proxying to multiple servers.
-+ Supports multiple server pools simultaneously.
-+ Shard data automatically across multiple servers.
-+ Implements the complete [memcached ascii](notes/memcache.txt) and [redis](notes/redis.md) protocol.
-+ Easy configuration of server pools through a YAML file.
-+ Supports multiple hashing modes including consistent hashing and distribution.
-+ Can be configured to disable nodes on failures.
-+ Observability through stats exposed on stats monitoring port.
++ Maintains persistent server connections 稳定的服务连接.
++ Keeps connection count on the backend caching servers low 与后端缓存服务保持较低的连接数.
++ Enables pipelining of requests and responses   支持管道方式请求与应答.   
++ Supports proxying to multiple servers    支持代理多个服务.
++ Supports multiple server pools simultaneously  支持同时池化多个服务的连接.
++ Shard data automatically across multiple servers 自动在多个服务器间切分数据.
++ Implements the complete [memcached ascii](notes/memcache.txt) and [redis](notes/redis.md) protocol   实现memcache 、redis 协议.
++ Easy configuration of server pools through a YAML file  通过YAML文件配置服务池.
++ Supports multiple hashing modes including consistent hashing and distribution   支持多个哈希模式包括一致性哈希和分布.
++ Can be configured to disable nodes on failures  可以配置为节点不存在时删除节点.
++ Observability through stats exposed on stats monitoring port  通过监控端口，监控服务状态.
 
 ## Help
 
