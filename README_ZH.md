@@ -72,9 +72,10 @@ To build nutcracker from source with _debug logs enabled_ and _assertions disabl
 ## Zero Copy
 
 In nutcracker, all the memory for incoming requests and outgoing responses is allocated in mbuf. Mbuf enables zero-copy because the same buffer on which a request was received from the client is used for forwarding it to the server. Similarly the same mbuf on which a response was received from the server is used for forwarding it to the client.
-
 Furthermore, memory for mbufs is managed using a reuse pool. This means that once mbuf is allocated, it is not deallocated, but just put back into the reuse pool. By default each mbuf chunk is set to 16K bytes in size. There is a trade-off between the mbuf size and number of concurrent connections nutcracker can support. A large mbuf size reduces the number of read syscalls made by nutcracker when reading requests or responses. However, with large mbuf size, every active connection would use up 16K bytes of buffer which might be an issue when nutcracker is handling large number of concurrent connections from clients. When nutcracker is meant to handle a large number of concurrent client connections, you should set chunk size to a small value like 512 bytes using the -m or --mbuf-size=N argument.
 
+在 nutcracker 中 传入请求和传出的响应所有的内存分配在mbuff(共享内存中)。Mbuf 实现零复制是因为，请求从客户端接收使用相同的缓冲区用于转发到服务器。同样，服务器响应接收也使用相同的缓冲区将其转发给客户端。
+此外，内存管理的mbuf使用重用池。这意味着，一旦mbuf的分配，它不释放，但刚刚放回的重用池。缺省情况下，每个mbuf的块被设置为16K字节的大小。有胡桃夹子可支持的并发连接的mbuf的大小和数量之间的权衡。大的mbuf大小减少了读取系统调用的数量由胡桃夹子时主动请求或响应。然而，随着大mbuf的大小，每一个活动的连接将使用16K字节的缓冲区，这可能是一个问题，当从客户胡桃夹子是处理大量的并发连接。当胡桃夹子是为了处理大量并发客户端连接，你应该设置一个小使用-m或 - mbuf的大小= N参数值，如512字节的块大小。
 ## Configuration
 
 nutcracker can be configured through a YAML file specified by the -c or --conf-file command-line argument on process start. The configuration file is used to specify the server pools and the servers within each pool that nutcracker manages. The configuration files parses and understands the following keys:
